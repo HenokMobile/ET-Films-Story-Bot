@@ -284,7 +284,7 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(text=text, reply_markup=reply_markup)
 
-    elif query.data == 'usage_back':
+    elif query.data == 'usage_back' or query.data == 'usage_menu':
         # This brings the user back to the main usage menu
         keyboard = [
             [InlineKeyboardButton("🎬 የፊልም ፍለጋ", callback_data='usage_film_search')],
@@ -294,7 +294,7 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
             [InlineKeyboardButton("📞 እገዛ & ድጋፍ", callback_data='usage_help')],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        sent_message = await query.edit_message_text(
+        await query.edit_message_text(
             '📚 የአጠቃቀም መመሪያ & መረጃ\n\nእባክዎ ከታች ካሉት አማራጮች በመምረጥ ዝርዝር መረጃ ያግኙ።',
             reply_markup=reply_markup
         )
