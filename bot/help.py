@@ -15,13 +15,13 @@ async def handle_usage_command(update: Update, context: ContextTypes.DEFAULT_TYP
         [InlineKeyboardButton("📞 እገዛ & ድጋፍ", callback_data='usage_help')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     # Send the message and get the sent message object
     sent_message = await update.message.reply_text(
         '📚 የአጠቃቀም መመሪያ & መረጃ\n\nእባክዎ ከታች ካሉት አማራጮች በመምረጥ ዝርዝር መረጃ ያግኙ።',
         reply_markup=reply_markup
     )
-    
+
     # Store the message ID in user_data to delete it later
     context.user_data['usage_message_id'] = sent_message.message_id
 
@@ -46,11 +46,11 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 1️⃣ **ነጠላ ፊልም 🎬**
    💵 ዋጋ: 3 ብር
    ✅ የነጠላ ፊልሞችን ብቻ ይፈልጋል
-   
+
 2️⃣ **ተከታታይ ፊልም 📽**
    💵 ዋጋ: 2 ብር
    ✅ የተከታታይ ፊልሞችን ብቻ ይፈልጋል
-   
+
 3️⃣ **ሁሉንም ፊልም 🎞**
    💵 ዋጋ: እንደ ዓይነቱ (3 ብር ወይም 2 ብር)
    ✅ በሁለቱም ዳታቤዝ ውስጥ ይፈልጋል
@@ -76,12 +76,18 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 ━━━━━━━━━━━━━━━━━━━━━━
 💡 ጠቃሚ ምክሮች:
 
-• ወደ ዋና ምናሌ ለመመለስ: ⬅️ ለመመለስ
+• ወደ ዋና ምናሌ ለመመለስ: 🏠 ወደ ዋና ምናሌ
 • ሂሳብዎን ለማየት: ቀር ሂሳብ 💰
 • ገንዘብ ለመጨመር: ገቢ ለማድረግ 🏦
 
 ℹ️ ለተጨማሪ እገዛ ➽ @Henok_Chat ✅"""
-        await query.edit_message_text(text=text, reply_markup=back_keyboard)
+        # Add back to main menu button
+        keyboard = [
+            [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
+            [InlineKeyboardButton("🏠 ወደ ዋና ምናሌ", callback_data="usage_back_to_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text=text, reply_markup=reply_markup)
 
     elif query.data == 'usage_payment':
         text = """💰 የገቢ ማድረግ አጠቃቀም መመሪያ
@@ -106,7 +112,7 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
    ▪️ **ስልክ ቁጥር** (Telebirr/CBEbirr/Card):
       ✅ +2519XXXXXXXX ወይም 09XXXXXXXX
       ✅ +2517XXXXXXXX ወይም 07XXXXXXXX
-   
+
    ▪️ **አካውንት ቁጥር** (CBE ብቻ):
       ✅ 1000 በሚል ይጀምር
       ✅ 13-16 አሃዞች
@@ -142,7 +148,13 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 • ከላኩ በኋላ ብቻ Screenshot ይላኩ
 
 ℹ️ ለእገዛ ➽ @Henok_Chat ✅"""
-        await query.edit_message_text(text=text, reply_markup=back_keyboard)
+        # Add back to main menu button
+        keyboard = [
+            [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
+            [InlineKeyboardButton("🏠 ወደ ዋና ምናሌ", callback_data="usage_back_to_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text=text, reply_markup=reply_markup)
 
     elif query.data == 'usage_referral':
         text = """🎁 የመጋበዝ ስርዓት መረጃ
@@ -170,8 +182,15 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 • የመጋበዝ ሊንክዎን ያጋሩ
 • ሽልማትዎን በፊልም ለመግዛት ይጠቀሙ
 
-ℹ️ ለተጨማሪ መረጃ ➽ @Henok_Chat ✅"""
-        await query.edit_message_text(text=text, reply_markup=back_keyboard)
+ℹ️ ለተጨማሪ መረጃ "ለመጋበዝ 🎁" ይጫኑ።"""
+        # Add back to main menu button
+        keyboard = [
+            [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
+            [InlineKeyboardButton("🏠 ወደ ዋና ምናሌ", callback_data="usage_back_to_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text=text, reply_markup=reply_markup)
+
 
     elif query.data == 'usage_faq':
         text = """❓ ተደጋጋሚ ጥያቄዎች (FAQ)
@@ -210,7 +229,13 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 💡 ለተጨማሪ ጥያቄዎች Admin ያነጋግሩ!
 
 📩 @Henok_Chat ✅"""
-        await query.edit_message_text(text=text, reply_markup=back_keyboard)
+        # Add back to main menu button
+        keyboard = [
+            [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
+            [InlineKeyboardButton("🏠 ወደ ዋና ምናሌ", callback_data="usage_back_to_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text=text, reply_markup=reply_markup)
 
     elif query.data == 'usage_help':
         text = """📞 እገዛ & ድጋፍ
@@ -251,7 +276,13 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 • የመጋበዝ ስርዓት ሽልማት አለው
 
 ℹ️ ለማንኛውም ጥያቄ ➽ @Henok_Chat ✅"""
-        await query.edit_message_text(text=text, reply_markup=back_keyboard)
+        # Add back to main menu button
+        keyboard = [
+            [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
+            [InlineKeyboardButton("🏠 ወደ ዋና ምናሌ", callback_data="usage_back_to_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text=text, reply_markup=reply_markup)
 
     elif query.data == 'usage_back':
         # This brings the user back to the main usage menu
@@ -269,3 +300,273 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         )
         # We also need to store the ID again if they go back to the menu
         context.user_data['usage_message_id'] = query.message.message_id
+
+    elif query.data == "usage_back_to_menu":
+        # Return to main menu
+        from bot import get_main_keyboard
+        try:
+            await query.message.delete()
+        except:
+            pass
+        await context.bot.send_message(
+            chat_id=query.message.chat.id,
+            text="🏠 ወደ ዋና ምናሌ ተመልሰዋል",
+            reply_markup=get_main_keyboard()
+        )
+
+
+# Placeholder functions for other usage callbacks
+async def show_single_movie_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = """🎬 የፊልም ፍለጋ አጠቃቀም መመሪያ
+
+📚 የፍለጋ ዓይነቶች:
+
+1️⃣ **ነጠላ ፊልም 🎬**
+   💵 ዋጋ: 3 ብር
+   ✅ የነጠላ ፊልሞችን ብቻ ይፈልጋል
+
+2️⃣ **ተከታታይ ፊልም 📽**
+   💵 ዋጋ: 2 ብር
+   ✅ የተከታታይ ፊልሞችን ብቻ ይፈልጋል
+
+3️⃣ **ሁሉንም ፊልም 🎞**
+   💵 ዋጋ: እንደ ዓይነቱ (3 ብር ወይም 2 ብር)
+   ✅ በሁለቱም ዳታቤዝ ውስጥ ይፈልጋል
+
+━━━━━━━━━━━━━━━━━━━━━━
+📖 እንዴት መጠቀም እንደሚቻል:
+
+▪️ የፊልም ዓይነት ይምረጡ (ከላይ ከተጠቀሱት)
+
+▪️ የፊልም ስም ይጻፉ:
+   ⚠️ ቢያንስ 3 ፊደል ይጻፉ
+   ⚠️ ከ60 ፊደል በላይ አይጻፉ
+   💡 የትክክለኛውን ስም መጻፍ ይሞክሩ
+
+▪️ ከውጤቱ የሚፈልጉትን ፊልም ይምረጡ
+   📄 በገጽ 5 ፊልሞች ብቻ ይታያሉ
+   ◀️ "ቀድሞ" / "ቀጣይ" ▶️ ለማለፍ
+
+▪️ ፊልም ሲጫኑ:
+   ✅ በቂ ሂሳብ ካለ ፊልም ይላካል
+   ❌ ሂሳብ ካልበቃ ገቢ ማድረግ ያስፈልጋል
+
+━━━━━━━━━━━━━━━━━━━━━━
+💡 ጠቃሚ ምክሮች:
+
+• ወደ ዋና ምናሌ ለመመለስ: 🏠 ወደ ዋና ምናሌ
+• ሂሳብዎን ለማየት: ቀር ሂሳብ 💰
+• ገንዘብ ለመጨመር: ገቢ ለማድረግ 🏦
+
+ℹ️ ለተጨማሪ እገዛ ➽ @Henok_Chat ✅"""
+    keyboard = [
+        [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
+        [InlineKeyboardButton("🏠 ወደ ዋና ምናሌ", callback_data="usage_back_to_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if update.message:
+        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=reply_markup)
+    else:
+        await update.callback_query.edit_message_text(text, parse_mode='Markdown', reply_markup=reply_markup)
+
+async def show_series_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = """📽 ተከታታይ ፊልሞች አጠቃቀም መመሪያ
+
+📚 የፍለጋ ዓይነቶች:
+
+1️⃣ **ነጠላ ፊልም 🎬**
+   💵 ዋጋ: 3 ብር
+   ✅ የነጠላ ፊልሞችን ብቻ ይፈልጋል
+
+2️⃣ **ተከታታይ ፊልም 📽**
+   💵 ዋጋ: 2 ብር
+   ✅ የተከታታይ ፊልሞችን ብቻ ይፈልጋል
+
+3️⃣ **ሁሉንም ፊልም 🎞**
+   💵 ዋጋ: እንደ ዓይነቱ (3 ብር ወይም 2 ብር)
+   ✅ በሁለቱም ዳታቤዝ ውስጥ ይፈልጋል
+
+━━━━━━━━━━━━━━━━━━━━━━
+📖 እንዴት መጠቀም እንደሚቻል:
+
+▪️ የፊልም ዓይነት ይምረጡ (ከላይ ከተጠቀሱት)
+
+▪️ የፊልም ስም ይጻፉ:
+   ⚠️ ቢያንስ 3 ፊደል ይጻፉ
+   ⚠️ ከ60 ፊደል በላይ አይጻፉ
+   💡 የትክክለኛውን ስም መጻፍ ይሞክሩ
+
+▪️ ከውጤቱ የሚፈልጉትን ፊልም ይምረጡ
+   📄 በገጽ 5 ፊልሞች ብቻ ይታያሉ
+   ◀️ "ቀድሞ" / "ቀጣይ" ▶️ ለማለፍ
+
+▪️ ፊልም ሲጫኑ:
+   ✅ በቂ ሂሳብ ካለ ፊልም ይላካል
+   ❌ ሂሳብ ካልበቃ ገቢ ማድረግ ያስፈልጋል
+
+━━━━━━━━━━━━━━━━━━━━━━
+💡 ጠቃሚ ምክሮች:
+
+• ወደ ዋና ምናሌ ለመመለስ: 🏠 ወደ ዋና ምናሌ
+• ሂሳብዎን ለማየት: ቀር ሂሳብ 💰
+• ገንዘብ ለመጨመር: ገቢ ለማድረግ 🏦
+
+ℹ️ ለተጨማሪ እገዛ ➽ @Henok_Chat ✅"""
+    keyboard = [
+        [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
+        [InlineKeyboardButton("🏠 ወደ ዋና ምናሌ", callback_data="usage_back_to_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if update.message:
+        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=reply_markup)
+    else:
+        await update.callback_query.edit_message_text(text, parse_mode='Markdown', reply_markup=reply_markup)
+
+async def show_all_films_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = """🎞 ሁሉንም ፊልሞች አጠቃቀም መመሪያ
+
+📚 የፍለጋ ዓይነቶች:
+
+1️⃣ **ነጠላ ፊልም 🎬**
+   💵 ዋጋ: 3 ብር
+   ✅ የነጠላ ፊልሞችን ብቻ ይፈልጋል
+
+2️⃣ **ተከታታይ ፊልም 📽**
+   💵 ዋጋ: 2 ብር
+   ✅ የተከታታይ ፊልሞችን ብቻ ይፈልጋል
+
+3️⃣ **ሁሉንም ፊልም 🎞**
+   💵 ዋጋ: እንደ ዓይነቱ (3 ብር ወይም 2 ብር)
+   ✅ በሁለቱም ዳታቤዝ ውስጥ ይፈልጋል
+
+━━━━━━━━━━━━━━━━━━━━━━
+📖 እንዴት መጠቀም እንደሚቻል:
+
+▪️ የፊልም ዓይነት ይምረጡ (ከላይ ከተጠቀሱት)
+
+▪️ የፊልም ስም ይጻፉ:
+   ⚠️ ቢያንስ 3 ፊደል ይጻፉ
+   ⚠️ ከ60 ፊደል በላይ አይጻፉ
+   💡 የትክክለኛውን ስም መጻፍ ይሞክሩ
+
+▪️ ከውጤቱ የሚፈልጉትን ፊልም ይምረጡ
+   📄 በገጽ 5 ፊልሞች ብቻ ይታያሉ
+   ◀️ "ቀድሞ" / "ቀጣይ" ▶️ ለማለፍ
+
+▪️ ፊልም ሲጫኑ:
+   ✅ በቂ ሂሳብ ካለ ፊልም ይላካል
+   ❌ ሂሳብ ካልበቃ ገቢ ማድረግ ያስፈልጋል
+
+━━━━━━━━━━━━━━━━━━━━━━
+💡 ጠቃሚ ምክሮች:
+
+• ወደ ዋና ምናሌ ለመመለስ: 🏠 ወደ ዋና ምናሌ
+• ሂሳብዎን ለማየት: ቀር ሂሳብ 💰
+• ገንዘብ ለመጨመር: ገቢ ለማድረግ 🏦
+
+ℹ️ ለተጨማሪ እገዛ ➽ @Henok_Chat ✅"""
+    keyboard = [
+        [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
+        [InlineKeyboardButton("🏠 ወደ ዋና ምናሌ", callback_data="usage_back_to_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if update.message:
+        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=reply_markup)
+    else:
+        await update.callback_query.edit_message_text(text, parse_mode='Markdown', reply_markup=reply_markup)
+
+async def show_balance_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = """💰 ሂሳብ እና ገቢ አጠቃቀም መመሪያ
+
+💡 **የሂሳብዎ ሁኔታ:**
+   • እርስዎ ያሎትን ቀሪ ሂሳብ ያሳያል
+
+💡 **ገቢ የማድረግ መንገዶች:**
+   • "ገቢ ለማድረግ 🏦" የሚለውን ይጫኑ
+   • Telebirr, CBEbirr, CBE Bank, Card
+
+━━━━━━━━━━━━━━━━━━━━━━
+📖 **የገቢ ሂደት:**
+   1. የክፍያ ዘዴ ይምረጡ
+   2. አስፈላጊውን መረጃ ያስገቡ
+   3. የገንዘብ መጠን ይጻፉ
+   4. Bot የላከውን አካውንት ይቅዱ
+   5. ገንዘብ ይላኩ
+   6. የክፍያ Screenshot ይላኩ
+   7. "አረጋግጥ" የሚለውን ይጫኑ
+   8. Admin እስኪያጸድቅ ይጠብቁ (በ30 ደቂቃ)
+
+━━━━━━━━━━━━━━━━━━━━━━
+💡 ጠቃሚ ምክሮች:
+
+• ትክክለኛውን የክፍያ አካውንት ይጠቀሙ
+• Screenshot ግልጽ መሆን አለበት
+• ዝቅተኛ ገቢ 10 ብር ነው
+
+ℹ️ ለተጨማሪ ጥያቄ Admin ን ያነጋግሩ።"""
+    keyboard = [
+        [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
+        [InlineKeyboardButton("🏠 ወደ ዋና ምናሌ", callback_data="usage_back_to_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if update.message:
+        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=reply_markup)
+    else:
+        await update.callback_query.edit_message_text(text, parse_mode='Markdown', reply_markup=reply_markup)
+
+async def show_referral_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = """🎁 የመጋበዝ ስርዓት መረጃ
+
+💡 የመጋበዝ ስርዓት እንዴት ይሰራል?
+
+**📋 ደረጃዎች:**
+
+1️⃣ **የእርስዎን የመጋበዝ ሊንክ ያግኙ**
+   ▪️ "ለመጋበዝ 🎁" የሚለውን ይጫኑ
+   ▪️ የእርስዎ የመጋበዝ ሊንክ ይመጣል
+
+2️⃣ **ሊንክ ለጓደኞቻቸው ያጋሩ**
+   ▪️ WhatsApp, Telegram, Facebook...
+   ▪️ ጓደኛዎ በሊንክ ሲመዘገብ
+
+3️⃣ **ሽልማት ያገኛሉ**
+   ✨ እያንዳንዱ የመጣ ጓደኛ
+   💰 የተወሰነ ገንዘብ ይቀበላሉ
+
+━━━━━━━━━━━━━━━━━━━━━━
+💡 ጠቃሚ ምክሮች:
+
+• ብዙ ጓደኞችን ያጋብዙ
+• የመጋበዝ ሊንክዎን ያጋሩ
+• ሽልማትዎን በፊልም ለመግዛት ይጠቀሙ
+
+ℹ️ ለተጨማሪ መረጃ "ለመጋበዝ 🎁" ይጫኑ።"""
+    keyboard = [
+        [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
+        [InlineKeyboardButton("🏠 ወደ ዋና ምናሌ", callback_data="usage_back_to_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if update.message:
+        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=reply_markup)
+    else:
+        await update.callback_query.edit_message_text(text, parse_mode='Markdown', reply_markup=reply_markup)
+
+async def show_menu_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles the callback for returning to the usage menu."""
+    keyboard = [
+        [InlineKeyboardButton("🎬 የፊልም ፍለጋ", callback_data='usage_film_search')],
+        [InlineKeyboardButton("💰 የገቢ ማድረግ", callback_data='usage_payment')],
+        [InlineKeyboardButton("🎁 የመጋበዝ መረጃ", callback_data='usage_referral')],
+        [InlineKeyboardButton("❓ FAQ", callback_data='usage_faq')],
+        [InlineKeyboardButton("📞 እገዛ & ድጋፍ", callback_data='usage_help')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.edit_message_text(
+        '📚 የአጠቃቀም መመሪያ & መረጃ\n\nእባክዎ ከታች ካሉት አማራጮች በመምረጥ ዝርዝር መረጃ ያግኙ።',
+        reply_markup=reply_markup
+    )
