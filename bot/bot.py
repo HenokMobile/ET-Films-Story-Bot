@@ -487,6 +487,9 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                         document=file_id
                     )
                     
+                    # Log download
+                    db.log_download(user_id, file_id, film_type, file_name)
+                    
                     await query.answer(f"✅ {PRICE} ብር ተከፍሏል!")
                     
                     # Clear user state and return to main menu
@@ -692,6 +695,9 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                         document=file_id
                     )
                     
+                    # Log download
+                    db.log_download(user_id, file_id, "movie", file_name)
+                    
                     await query.answer(f"✅ {MOVIE_PRICE} ብር ተከፍሏል!")
                     
                     # Clear user state and return to main menu
@@ -765,6 +771,9 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                         chat_id=query.message.chat.id,
                         document=file_id
                     )
+                    
+                    # Log download
+                    db.log_download(user_id, file_id, "series", file_name)
                     
                     await query.answer(f"✅ {SERIES_PRICE} ብር ተከፍሏል!")
                     

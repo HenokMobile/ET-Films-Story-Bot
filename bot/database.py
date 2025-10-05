@@ -116,9 +116,16 @@ class DatabaseManager:
                     file_name TEXT,
                     file_title TEXT,
                     channel_id INTEGER,
+                    file_size INTEGER DEFAULT 0,
                     joined_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+            
+            # Add file_size column if it doesn't exist
+            try:
+                conn.execute('ALTER TABLE single_movies ADD COLUMN file_size INTEGER DEFAULT 0')
+            except sqlite3.OperationalError:
+                pass
 
         # Series database
         with sqlite3.connect(config.SERIES_DB_PATH) as conn:
@@ -131,7 +138,27 @@ class DatabaseManager:
                     file_name TEXT,
                     file_title TEXT,
                     channel_id INTEGER,
+                    file_size INTEGER DEFAULT 0,
                     joined_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Add file_size column if it doesn't exist
+            try:
+                conn.execute('ALTER TABLE series ADD COLUMN file_size INTEGER DEFAULT 0')
+            except sqlite3.OperationalError:
+                pass
+        
+        # Download logs table in user database
+        with sqlite3.connect(config.USER_DB_PATH) as conn:
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS download_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    file_id TEXT NOT NULL,
+                    file_type TEXT NOT NULL,
+                    file_name TEXT,
+                    download_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
 
@@ -270,6 +297,19 @@ class DatabaseManager:
                     'total_earnings': result[1] if result[1] else 0
                 }
             return {'referral_count': 0, 'total_earnings': 0}
+
+    def log_download(self, user_id, file_id, file_type, file_name=None):
+        """Log a movie/series download"""
+        try:
+            with sqlite3.connect(config.USER_DB_PATH) as conn:
+                conn.execute('''
+                    INSERT INTO download_logs (user_id, file_id, file_type, file_name)
+                    VALUES (?, ?, ?, ?)
+                ''', (user_id, file_id, file_type, file_name))
+                conn.commit()
+                logger.info(f"Download logged: user={user_id}, file={file_name}, type={file_type}")
+        except Exception as e:
+            logger.error(f"Error logging download: {e}")
 
 
 # Global database instance

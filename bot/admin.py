@@ -58,7 +58,6 @@ class AdminPanel:
             [InlineKeyboardButton("💰 ሂሳብ ለመቆጣጠር", callback_data="admin_finance")],
             [InlineKeyboardButton("👥 የተጠቃሚዎች ስታቲስቲክስ", callback_data="admin_users")],
             [InlineKeyboardButton("🎬 የፊልም ስታቲስቲክስ", callback_data="admin_movies")],
-            [InlineKeyboardButton("📽 የተከታታይ ፊልም ስታቲስቲክስ", callback_data="admin_series")],
             [InlineKeyboardButton("🎁 የግብዣ ስታቲስቲክስ", callback_data="admin_referrals")],
             [InlineKeyboardButton("⚙️ የቦት ቅንብሮች", callback_data="admin_settings")]
         ]
@@ -332,56 +331,131 @@ class AdminPanel:
         await query.edit_message_text(text, reply_markup=reply_markup)
 
     async def show_movie_statistics(self, query, context):
-        """Show movie statistics"""
+        """Show combined movie and series statistics with file size and downloads"""
         try:
+            # Single movies stats
             with sqlite3.connect(config.SINGLE_DB_PATH) as conn:
-                cursor = conn.execute("SELECT COUNT(*) FROM single_movies")
-                total_movies = cursor.fetchone()[0]
+                cursor = conn.execute("SELECT COUNT(*), COALESCE(SUM(file_size), 0) FROM single_movies")
+                single_data = cursor.fetchone()
+                total_movies = single_data[0] or 0
+                total_movie_size = single_data[1] or 0
 
                 cursor = conn.execute("""
                     SELECT COUNT(*) FROM single_movies 
                     WHERE joined_date >= date('now', '-1 day')
                 """)
-                today_movies = cursor.fetchone()[0]
-        except:
-            total_movies = today_movies = 0
+                today_movies = cursor.fetchone()[0] or 0
+                
+                cursor = conn.execute("""
+                    SELECT COUNT(*) FROM single_movies 
+                    WHERE joined_date >= date('now', '-7 days')
+                """)
+                week_movies = cursor.fetchone()[0] or 0
 
-        keyboard = [[InlineKeyboardButton("🔙 ወደ Admin Panel", callback_data="back_to_admin")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        text = (
-            "🎬 Movie Statistics\n\n"
-            f"📊 ጠቅላላ ነጠላ ፊልሞች: {total_movies}\n"
-            f"📅 ዛሬ የተጨመሩ: {today_movies}"
-        )
-
-        await query.edit_message_text(text, reply_markup=reply_markup)
-
-    async def show_series_statistics(self, query, context):
-        """Show series statistics"""
-        try:
+            # Series stats
             with sqlite3.connect(config.SERIES_DB_PATH) as conn:
-                cursor = conn.execute("SELECT COUNT(*) FROM series")
-                total_series = cursor.fetchone()[0]
+                cursor = conn.execute("SELECT COUNT(*), COALESCE(SUM(file_size), 0) FROM series")
+                series_data = cursor.fetchone()
+                total_series = series_data[0] or 0
+                total_series_size = series_data[1] or 0
 
                 cursor = conn.execute("""
                     SELECT COUNT(*) FROM series 
                     WHERE joined_date >= date('now', '-1 day')
                 """)
-                today_series = cursor.fetchone()[0]
-        except:
-            total_series = today_series = 0
+                today_series = cursor.fetchone()[0] or 0
+                
+                cursor = conn.execute("""
+                    SELECT COUNT(*) FROM series 
+                    WHERE joined_date >= date('now', '-7 days')
+                """)
+                week_series = cursor.fetchone()[0] or 0
+
+            # Download stats
+            with sqlite3.connect(config.USER_DB_PATH) as conn:
+                cursor = conn.execute("""
+                    SELECT COUNT(*) FROM download_logs 
+                    WHERE download_date >= date('now', '-1 day')
+                """)
+                today_downloads = cursor.fetchone()[0] or 0
+                
+                cursor = conn.execute("""
+                    SELECT COUNT(*) FROM download_logs 
+                    WHERE download_date >= date('now', '-7 days')
+                """)
+                week_downloads = cursor.fetchone()[0] or 0
+                
+                cursor = conn.execute("SELECT COUNT(*) FROM download_logs")
+                total_downloads = cursor.fetchone()[0] or 0
+                
+                # Top downloaded movies
+                cursor = conn.execute("""
+                    SELECT file_name, COUNT(*) as count 
+                    FROM download_logs 
+                    WHERE file_name IS NOT NULL
+                    GROUP BY file_id 
+                    ORDER BY count DESC 
+                    LIMIT 5
+                """)
+                top_downloads = cursor.fetchall()
+
+        except Exception as e:
+            logger.error(f"Error fetching movie statistics: {e}")
+            total_movies = today_movies = week_movies = 0
+            total_series = today_series = week_series = 0
+            total_movie_size = total_series_size = 0
+            today_downloads = week_downloads = total_downloads = 0
+            top_downloads = []
+
+        # Calculate sizes in GB/MB
+        total_size_bytes = total_movie_size + total_series_size
+        if total_size_bytes >= 1073741824:  # >= 1GB
+            total_size_str = f"{total_size_bytes / 1073741824:.2f} GB"
+        else:
+            total_size_str = f"{total_size_bytes / 1048576:.2f} MB"
+
+        avg_size = (total_movie_size + total_series_size) / (total_movies + total_series) if (total_movies + total_series) > 0 else 0
+        avg_size_str = f"{avg_size / 1048576:.2f} MB" if avg_size > 0 else "0 MB"
+
+        # Top downloads text
+        top_downloads_text = ""
+        if top_downloads:
+            for i, (name, count) in enumerate(top_downloads, 1):
+                display_name = name[:30] + "..." if name and len(name) > 30 else (name or "Unknown")
+                top_downloads_text += f"{i}. {display_name} - {count} ×\n"
+        else:
+            top_downloads_text = "ገና የታወቁ downloads የሉም\n"
 
         keyboard = [[InlineKeyboardButton("🔙 ወደ Admin Panel", callback_data="back_to_admin")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         text = (
-            "📽 Series Statistics\n\n"
-            f"📊 ጠቅላላ ተከታታይ ፊልሞች: {total_series}\n"
-            f"📅 ዛሬ የተጨመሩ: {today_series}"
+            "🎬 የፊልም ስታቲስቲክስ\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "📊 የፊልም ብዛት:\n"
+            f"• ጠቅላላ ነጠላ ፊልሞች: {total_movies:,}\n"
+            f"• ጠቅላላ ተከታታይ ፊልሞች: {total_series:,}\n"
+            f"• ዛሬ የተጨመሩ: {today_movies + today_series:,}\n"
+            f"• በሳምንት የተጨመሩ: {week_movies + week_series:,}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "💾 የStorage መረጃ:\n"
+            f"• ጠቅላላ File Size: {total_size_str}\n"
+            f"• አማካይ File Size: {avg_size_str}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "📈 የDownload ስታቲስቲክስ:\n"
+            f"• ዛሬ የተላኩ ፊልሞች: {today_downloads:,}\n"
+            f"• በሳምንት የተላኩ: {week_downloads:,}\n"
+            f"• ጠቅላላ Downloads: {total_downloads:,}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "🏆 Top 5 Downloaded:\n"
+            f"{top_downloads_text}"
         )
 
         await query.edit_message_text(text, reply_markup=reply_markup)
+
+    async def show_series_statistics(self, query, context):
+        """Redirect to combined movie statistics"""
+        await self.show_movie_statistics(query, context)
 
     async def show_referral_statistics(self, query, context):
         """Show referral statistics"""
@@ -465,7 +539,6 @@ class AdminPanel:
             [InlineKeyboardButton("💰 ሂሳብ ለመቆጣጠር", callback_data="admin_finance")],
             [InlineKeyboardButton("👥 የተጠቃሚዎች ስታቲስቲክስ", callback_data="admin_users")],
             [InlineKeyboardButton("🎬 የፊልም ስታቲስቲክስ", callback_data="admin_movies")],
-            [InlineKeyboardButton("📽 የተከታታይ ፊልም ስታቲስቲክስ", callback_data="admin_series")],
             [InlineKeyboardButton("🎁 የግብዣ ስታቲስቲክስ", callback_data="admin_referrals")],
             [InlineKeyboardButton("⚙️ የቦት ቅንብሮች", callback_data="admin_settings")]
         ]
