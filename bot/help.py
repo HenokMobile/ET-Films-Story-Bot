@@ -82,27 +82,64 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         await query.edit_message_text(text=text, reply_markup=back_keyboard)
 
     elif query.data == 'usage_payment':
-        text = """🏦 የገቢ ማድረግ አጠቃቀም
+        text = """💰 የገቢ ማድረግ አጠቃቀም መመሪያ
 
-1. ገቢ ለማድረግ "ገቢ ለማድረግ 🏦" የምል ይጫኑ
+📋 የክፍያ ዘዴዎች:
 
-2. 💰 የክፍያ ዘዴ ይምረጡ
-📱 Telebirr  |  🏦 CBE
-🌐 CBEbirr  |  💳 Card
+1️⃣ **Telebirr 📱**
+2️⃣ **CBEbirr 🌐**
+3️⃣ **CBE Bank 🏦**
+4️⃣ **Card 💳**
 
-3.🧾 አንዱን በመምረጥ እርሱ ስም ስጠይቅ ያስገቡ 
+💵 **ዝቅተኛ ገቢ መጠን: 10 ብር**
 
-4.♻️ የእርሱ ስልክ ቁጥር ወይንም Account ቁጥር ስጠይቅ ያስገቡ
+━━━━━━━━━━━━━━━━━━━━━━
+📖 የገቢ ደረጃዎች:
 
-5.✳️ ገቢ ለማድረግ የፈለጉትን የብር መጠን ያስገቡ
+**1️⃣ የክፍያ ዘዴ መምረጥ**
+   ▪️ "ገቢ ለማድረግ 🏦" ይጫኑ
+   ▪️ የሚመችዎትን ዘዴ ይምረጡ
 
-6.❇️ የክፍያ Account ወይንም ስልክ ቁጥር ስመጣ በዚህ ቁጥር ገቢ በማድረግ Screenshot photo ይላኩ
+**2️⃣ መረጃ ማስገባት**
+   ▪️ **ስልክ ቁጥር** (Telebirr/CBEbirr/Card):
+      ✅ +2519XXXXXXXX ወይም 09XXXXXXXX
+      ✅ +2517XXXXXXXX ወይም 07XXXXXXXX
+   
+   ▪️ **አካውንት ቁጥር** (CBE ብቻ):
+      ✅ 1000 በሚል ይጀምር
+      ✅ 13-16 አሃዞች
 
-7.➰ የክፍያ መረጃ በማየት አረጋግጥ የምል ይጫኑ
+**3️⃣ ሙሉ ስም ማስገባት**
+   ⚠️ ቢያንስ 3 ፊደል
+   ⚠️ ቁጥር መጻፍ የለበትም
 
-8.✔️ ከዚህያ በኋላ ብር ወደ Account ገቢ ይሆናል
+**4️⃣ የገንዘብ መጠን ማስገባት**
+   💵 ዝቅተኛ: 10 ብር
 
-                  📩 @Henok_Chat ☑️"""
+**5️⃣ የክፍያ መረጃ መቀበል**
+   📱 Bot የክፍያ አካውንት ይልካል
+   ⚡️ ወደዚህ አካውንት ገንዘብ ይላኩ
+
+**6️⃣ Screenshot ማስረጃ መላክ**
+   📸 የክፍያ Screenshot (Photo) ይላኩ
+   💳 Card: የEthiotelecom መልእክት screenshot
+
+**7️⃣ ማረጋገጥ**
+   ✅ "አረጋግጥ" የሚለውን ይጫኑ
+
+**8️⃣ Admin ማጽደቅ መጠበቅ**
+   ⏱ በ30 ደቂቃ ውስጥ
+   ✅ በተቀበለ → ገንዘብ ወደ ሂሳብዎ ይገባል
+   ❌ ውድቅ ከሆነ → መልእክት ይደርሰዎታል
+
+━━━━━━━━━━━━━━━━━━━━━━
+💡 ጠቃሚ ምክሮች:
+
+• Screenshot ግልጽ መሆን አለበት
+• ትክክለኛ መጠን ማስገባት
+• ከላኩ በኋላ ብቻ Screenshot ይላኩ
+
+ℹ️ ለእገዛ ➽ @Henok_Chat ✅"""
         await query.edit_message_text(text=text, reply_markup=back_keyboard)
 
     elif query.data == 'usage_help':
