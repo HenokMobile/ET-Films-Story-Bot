@@ -8,15 +8,17 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends a message with inline keyboard for usage instructions and stores its ID."""
     keyboard = [
-        [InlineKeyboardButton("🍿 የፊልም ፍለጋ አጠቃቀም", callback_data='usage_film_search')],
-        [InlineKeyboardButton("🏦 የገቢ ማድረግ አጠቃቀም", callback_data='usage_payment')],
-        [InlineKeyboardButton("❓ እገዛ", callback_data='usage_help')],
+        [InlineKeyboardButton("🎬 የፊልም ፍለጋ", callback_data='usage_film_search')],
+        [InlineKeyboardButton("💰 የገቢ ማድረግ", callback_data='usage_payment')],
+        [InlineKeyboardButton("🎁 የመጋበዝ መረጃ", callback_data='usage_referral')],
+        [InlineKeyboardButton("❓ FAQ", callback_data='usage_faq')],
+        [InlineKeyboardButton("📞 እገዛ & ድጋፍ", callback_data='usage_help')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     # Send the message and get the sent message object
     sent_message = await update.message.reply_text(
-        '❓ የአጠቃቀም መመሪያ\n\nእባክዎ ከታች ካሉት አማራጮች በመምረጥ ዝርዝር መረጃ ያግኙ።\n\n ወደ menu ለመመለስ',
+        '📚 የአጠቃቀም መመሪያ & መረጃ\n\nእባክዎ ከታች ካሉት አማራጮች በመምረጥ ዝርዝር መረጃ ያግኙ።',
         reply_markup=reply_markup
     )
     
@@ -142,20 +144,127 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 ℹ️ ለእገዛ ➽ @Henok_Chat ✅"""
         await query.edit_message_text(text=text, reply_markup=back_keyboard)
 
+    elif query.data == 'usage_referral':
+        text = """🎁 የመጋበዝ ስርዓት መረጃ
+
+💡 የመጋበዝ ስርዓት እንዴት ይሰራል?
+
+**📋 ደረጃዎች:**
+
+1️⃣ **የእርስዎን የመጋበዝ ሊንክ ያግኙ**
+   ▪️ "ለመጋበዝ 🎁" የሚለውን ይጫኑ
+   ▪️ የእርስዎ የመጋበዝ ሊንክ ይመጣል
+
+2️⃣ **ሊንክ ለጓደኞቻቸው ያጋሩ**
+   ▪️ WhatsApp, Telegram, Facebook...
+   ▪️ ጓደኛዎ በሊንክ ሲመዘገብ
+
+3️⃣ **ሽልማት ያገኛሉ**
+   ✨ እያንዳንዱ የመጣ ጓደኛ
+   💰 የተወሰነ ገንዘብ ይቀበላሉ
+
+━━━━━━━━━━━━━━━━━━━━━━
+💡 ጠቃሚ ምክሮች:
+
+• ብዙ ጓደኞችን ያጋብዙ
+• የመጋበዝ ሊንክዎን ያጋሩ
+• ሽልማትዎን በፊልም ለመግዛት ይጠቀሙ
+
+ℹ️ ለተጨማሪ መረጃ ➽ @Henok_Chat ✅"""
+        await query.edit_message_text(text=text, reply_markup=back_keyboard)
+
+    elif query.data == 'usage_faq':
+        text = """❓ ተደጋጋሚ ጥያቄዎች (FAQ)
+
+**💵 ፊልም ስንት ወጪ ያስከፍላል?**
+   🎬 ነጠላ ፊልም: 3 ብር
+   📽 ተከታታይ ፊልም: 2 ብር
+
+**💰 እንዴት ገንዘብ ማድረግ እችላለሁ?**
+   • "ገቢ ለማድረግ 🏦" ይጫኑ
+   • Telebirr/CBE/CBEbirr/Card ይምረጡ
+   • መመሪያውን ይከተሉ
+   • ዝቅተኛ: 10 ብር
+
+**🔍 ፊልም ካላገኘሁ?**
+   • ትክክለኛ ስም መጻፉን ያረጋግጡ
+   • ቢያንስ 3 ፊደል ይጻፉ
+   • "🎞 ሁሉንም ፊልም" ይሞክሩ
+   • Admin ያናግሩ: @Henok_Chat
+
+**💳 ገንዘብ መቼ ይገባል?**
+   ⏱ በ30 ደቂቃ ውስጥ
+   ✅ Admin ካረጋገጠ በኋላ
+
+**📸 Screenshot ካልኖረኝ?**
+   • ገንዘብ ካስተላለፉ በኋላ
+   • የክፍያ መልእክት screenshot ያንሱ
+   • ግልጽ መሆን አለበት
+
+**🎁 የመጋበዝ ሽልማት ስንት ነው?**
+   • "ለመጋበዝ 🎁" ላይ ይመልከቱ
+   • እያንዳንዱ ጓደኛ ሲመጣ
+   • ሽልማት ይቀበላሉ
+
+━━━━━━━━━━━━━━━━━━━━━━
+💡 ለተጨማሪ ጥያቄዎች Admin ያነጋግሩ!
+
+📩 @Henok_Chat ✅"""
+        await query.edit_message_text(text=text, reply_markup=back_keyboard)
+
     elif query.data == 'usage_help':
-        text ="ℹ️ ለተጨማሪ እገዛ እኛን ያግኙ ➲ @Hnok_Chat✅"
+        text = """📞 እገዛ & ድጋፍ
+
+🛠 **ችግር ካጋጠመዎ:**
+
+**1️⃣ የቴክኒክ ችግሮች**
+   ▪️ Bot መልስ የለውም?
+   ▪️ ፊልም አይላክም?
+   ▪️ ገንዘብ አልገባም?
+   → Admin ያናግሩ
+
+**2️⃣ የክፍያ ችግሮች**
+   ▪️ Screenshot ተቸግረዋል?
+   ▪️ ገንዘብ ላኩ ግን አልገባም?
+   ▪️ የተሳሳተ መጠን አስገብተዋል?
+   → Screenshot ጋር Admin ያናግሩ
+
+**3️⃣ የፊልም ጥያቄዎች**
+   ▪️ የተወሰነ ፊልም ይፈልጋሉ?
+   ▪️ ፊልም ጥራት ችግር?
+   ▪️ ፊልም ስም ስህተት?
+   → Admin ያሳውቁ
+
+━━━━━━━━━━━━━━━━━━━━━━
+📱 **የAdmin መገናኛ:**
+
+💬 Telegram: @Henok_Chat
+⏰ የምላሽ ጊዜ: በቅርቡ
+✅ ሁሌም ድጋፍ ዝግጁ ነው!
+
+━━━━━━━━━━━━━━━━━━━━━━
+💡 **ጠቃሚ መረጃ:**
+
+• Bot 24/7 ይሰራል
+• ፊልም ወዲያውኑ ይላካል (ሂሳብ ካለ)
+• ገንዘብ በ30 ደቂቃ ውስጥ ይገባል
+• የመጋበዝ ስርዓት ሽልማት አለው
+
+ℹ️ ለማንኛውም ጥያቄ ➽ @Henok_Chat ✅"""
         await query.edit_message_text(text=text, reply_markup=back_keyboard)
 
     elif query.data == 'usage_back':
         # This brings the user back to the main usage menu
         keyboard = [
-            [InlineKeyboardButton("🍿 የፊልም ፍለጋ አጠቃቀም", callback_data='usage_film_search')],
-            [InlineKeyboardButton("🏦 የገቢ ማድረግ አጠቃቀም", callback_data='usage_payment')],
-            [InlineKeyboardButton("❓ እገዛ", callback_data='usage_help')],
+            [InlineKeyboardButton("🎬 የፊልም ፍለጋ", callback_data='usage_film_search')],
+            [InlineKeyboardButton("💰 የገቢ ማድረግ", callback_data='usage_payment')],
+            [InlineKeyboardButton("🎁 የመጋበዝ መረጃ", callback_data='usage_referral')],
+            [InlineKeyboardButton("❓ FAQ", callback_data='usage_faq')],
+            [InlineKeyboardButton("📞 እገዛ & ድጋፍ", callback_data='usage_help')],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         sent_message = await query.edit_message_text(
-            '❓ የአጠቃቀም መመሪያ\n\nእባክዎ ከታች ካሉት አማራጮች በመምረጥ ዝርዝር መረጃ ያግኙ።\n\n ወደ menu ለመመለስ',
+            '📚 የአጠቃቀም መመሪያ & መረጃ\n\nእባክዎ ከታች ካሉት አማራጮች በመምረጥ ዝርዝር መረጃ ያግኙ።',
             reply_markup=reply_markup
         )
         # We also need to store the ID again if they go back to the menu
