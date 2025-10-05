@@ -303,7 +303,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     # Admin commands
-    elif text == "/admin" and user.id == config.ADMIN_USER_ID:
+    elif text == "/henok" and user.id == config.ADMIN_USER_ID:
         await admin_panel.show_admin_panel(update, context)
 
     # Handle user states for search
@@ -823,10 +823,10 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
     await admin_panel.handle_admin_callback(update, context)
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /admin command"""
+    """Handle /henok command"""
     user = update.effective_user
 
-    logger.info(f"Admin command received from user {user.id}, expected admin {config.ADMIN_USER_ID}")
+    logger.info(f"Henok command received from user {user.id}, expected admin {config.ADMIN_USER_ID}")
 
     if user.id == config.ADMIN_USER_ID:
         await admin_panel.show_admin_panel(update, context)
@@ -922,7 +922,7 @@ async def main():
     # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("admin", admin_command))
+    application.add_handler(CommandHandler("henok", admin_command))
     application.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     application.add_handler(CallbackQueryHandler(handle_usage_callbacks, pattern='^usage_'))
