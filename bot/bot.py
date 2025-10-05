@@ -924,6 +924,23 @@ async def single_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     USER_STATES[user.id] = WAITING_FOR_MOVIE_SEARCH
 
+async def all_films_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /all_films command - Start all films search"""
+    user = update.effective_user
+    
+    if not db.user_exists(user.id):
+        await start(update, context)
+        return
+    
+    back_keyboard = [[KeyboardButton("⬅️ ለመመለስ")]]
+    back_reply_markup = ReplyKeyboardMarkup(back_keyboard, resize_keyboard=True)
+    
+    await update.message.reply_text(
+        "የምፈልጉትን ፊልም ስም ይጻፉ (ነጠላ ወይም ተከታታይ):",
+        reply_markup=back_reply_markup
+    )
+    USER_STATES[user.id] = WAITING_FOR_ALL_SEARCH
+
 # Global variables for batch processing
 BATCH_QUEUE = []
 BATCH_TIMER = None
@@ -1019,6 +1036,7 @@ async def main():
     application.add_handler(CommandHandler("referral", referral_command))
     application.add_handler(CommandHandler("series", series_command))
     application.add_handler(CommandHandler("single", single_command))
+    application.add_handler(CommandHandler("all_films", all_films_command))
     application.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     application.add_handler(CallbackQueryHandler(handle_usage_callbacks, pattern='^usage_'))
