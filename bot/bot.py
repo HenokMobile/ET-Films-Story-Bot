@@ -833,6 +833,97 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❌ የAdmin መብት የለዎትም!")
 
+async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /balance command - Show user balance"""
+    user = update.effective_user
+    
+    if not db.user_exists(user.id):
+        await start(update, context)
+        return
+    
+    try:
+        user_balance = db.get_user_balance(user.id)
+        
+        if user_balance is None:
+            balance_amount = 0
+        else:
+            try:
+                balance_amount = int(float(user_balance))
+            except (ValueError, TypeError):
+                logger.error(f"Invalid balance value for user {user.id}: {user_balance}")
+                balance_amount = 0
+        
+        await update.message.reply_text(
+            f"💰 የእርስዎ ሒሳብ መጠን\n\n"
+            f"💵 ያለዎት ገንዘብ: {balance_amount:,} ብር\n\n"
+            f"💡 ገንዘብ ለመጨመር /payment ይጠቀሙ",
+            reply_markup=get_main_keyboard()
+        )
+        logger.info(f"Balance displayed for user {user.id}: {balance_amount} ብር")
+        
+    except Exception as e:
+        logger.error(f"Error showing balance for user {user.id}: {e}", exc_info=True)
+        await update.message.reply_text(
+            f"💰 የእርስዎ ሒሳብ መጠን\n\n"
+            f"💵 ያለዎት ገንዘብ: 0 ብር\n\n"
+            f"⚠️ የሒሳብ መረጃ ለማግኘት ችግር ተፈጥሯል። እባክዎ እንደገና ይሞክሩ።",
+            reply_markup=get_main_keyboard()
+        )
+
+async def payment_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /payment command - Show payment menu"""
+    user = update.effective_user
+    
+    if not db.user_exists(user.id):
+        await start(update, context)
+        return
+    
+    await payment_system.show_payment_menu(update, context)
+
+async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /referral command - Show referral info"""
+    user = update.effective_user
+    
+    if not db.user_exists(user.id):
+        await start(update, context)
+        return
+    
+    await referral_system.show_referral_info(update, context)
+
+async def series_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /series command - Start series search"""
+    user = update.effective_user
+    
+    if not db.user_exists(user.id):
+        await start(update, context)
+        return
+    
+    back_keyboard = [[KeyboardButton("⬅️ ለመመለስ")]]
+    back_reply_markup = ReplyKeyboardMarkup(back_keyboard, resize_keyboard=True)
+    
+    await update.message.reply_text(
+        "የምፈልጉትን ተከታታይ ፊልም ስም ይጻፉ:",
+        reply_markup=back_reply_markup
+    )
+    USER_STATES[user.id] = WAITING_FOR_SERIES_SEARCH
+
+async def single_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /single command - Start single movie search"""
+    user = update.effective_user
+    
+    if not db.user_exists(user.id):
+        await start(update, context)
+        return
+    
+    back_keyboard = [[KeyboardButton("⬅️ ለመመለስ")]]
+    back_reply_markup = ReplyKeyboardMarkup(back_keyboard, resize_keyboard=True)
+    
+    await update.message.reply_text(
+        "የምፈልጉትን ነጠላ ፊልም ስም ይጻፉ:",
+        reply_markup=back_reply_markup
+    )
+    USER_STATES[user.id] = WAITING_FOR_MOVIE_SEARCH
+
 # Global variables for batch processing
 BATCH_QUEUE = []
 BATCH_TIMER = None
@@ -923,6 +1014,11 @@ async def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("henok", admin_command))
+    application.add_handler(CommandHandler("balance", balance_command))
+    application.add_handler(CommandHandler("payment", payment_command))
+    application.add_handler(CommandHandler("referral", referral_command))
+    application.add_handler(CommandHandler("series", series_command))
+    application.add_handler(CommandHandler("single", single_command))
     application.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     application.add_handler(CallbackQueryHandler(handle_usage_callbacks, pattern='^usage_'))
