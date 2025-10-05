@@ -103,21 +103,31 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_name=user.last_name
         )
         
+        # Add welcome bonus to new user
+        import sqlite3
+        with sqlite3.connect(config.USER_DB_PATH) as conn:
+            conn.execute(
+                'UPDATE users SET balance = balance + ? WHERE user_id = ?',
+                (config.WELCOME_BONUS, user.id)
+            )
+            conn.commit()
+        
         pending_referrer = context.user_data.get('pending_referrer')
         if pending_referrer:
             await referral_system.process_referral(user.id, pending_referrer, context)
             context.user_data.pop('pending_referrer', None)
 
         await update.message.reply_text(
-            "✅ መመዝገብዎ ተሳክቷል!\n\n"
+            f"✅ መመዝገብዎ ተሳክቷል!\n"
+            f"🎁 የ{config.WELCOME_BONUS} ብር Welcome Bonus አግኝተዋል!\n\n"
             "እንኳን ወደ ET Films Story Bot 🎥 በደህና መጡ!\n\n"
+            f"💰 የአሁን ቀሪ ሂሳብዎ: {config.WELCOME_BONUS} ብር\n"
+            "🎬 የመጀመሪያውን ፊልም ነፃ ይመልከቱ!\n\n"
             "🎬 ምን ማድረግ ይችላሉ?\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "📽 ተከታታይ ፊልም - የድራማ ተከታታዮች\n"
             "🎬 ነጠላ ፊልም - ነጠላ ፊልሞች\n"
             "🎞 ሁሉንም ፊልም - በሁሉም ውስጥ ይፈልጉ\n\n"
-            "💰 አገልግሎት\n"
-            "━━━━━━━━━━━━━━━━━━\n"
             "💵 ቀሪ ሂሳብ - ሂሳብዎን ይመልከቱ\n"
             "🏦 ገቢ ለማድረግ - ቀሪ ሂሳብ ይሙሉ\n"
             "🎁 ለመጋበዝ - ጓደኞችን በመጋበዝ ይተርፉ (2 ብር/ሰው)\n\n"

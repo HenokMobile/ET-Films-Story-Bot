@@ -14,5 +14,8 @@ SINGLE_DB_PATH = "single.db"
 SERIES_DB_PATH = "series.db"
 USER_DB_PATH = "user.db"
 
+# Welcome Bonus Configuration
+WELCOME_BONUS = 5  # Birr given to new users
+
 # AI Configuration - Disabled
 GEMINI_API_KEY = None  # AI search disabled
