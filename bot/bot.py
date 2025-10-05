@@ -109,8 +109,21 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.pop('pending_referrer', None)
 
         await update.message.reply_text(
-            "እግዚአብሔር ይመሰግናችሁ! 🙏\n\n"
-            "አሁን የ ET Films Story Bot 🎥 ሁሉንም አገልግሎት መጠቀም ይችላሉ።",
+            "✅ መመዝገብዎ ተሳክቷል!\n\n"
+            "እንኳን ወደ ET Films Story Bot 🎥 በደህና መጡ!\n\n"
+            "🎬 ምን ማድረግ ይችላሉ?\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📽 ተከታታይ ፊልም - የድራማ ተከታታዮች\n"
+            "🎬 ነጠላ ፊልም - ነጠላ ፊልሞች\n"
+            "🎞 ሁሉንም ፊልም - በሁሉም ውስጥ ይፈልጉ\n\n"
+            "💰 አገልግሎት\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "💵 ቀሪ ሂሳብ - ሂሳብዎን ይመልከቱ\n"
+            "🏦 ገቢ ለማድረግ - ቀሪ ሂሳብ ይሙሉ\n"
+            "🎁 ለመጋበዝ - ጓደኞችን በመጋበዝ ይተርፉ (2 ብር/ሰው)\n\n"
+            "ℹ️ የፊልሞች ዋጋ: 5 ብር ብቻ!\n"
+            "📱 ለእገዛ: ⚙️ አጠቃቀም ይጫኑ\n\n"
+            "እንደሚያስደስት ተስፋ እናደርጋለን! 🍿✨",
             reply_markup=get_main_keyboard()
         )
 
