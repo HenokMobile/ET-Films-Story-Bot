@@ -841,6 +841,9 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start(update, context)
         return
     
+    # Clear search state
+    USER_STATES.pop(user.id, None)
+    
     try:
         user_balance = db.get_user_balance(user.id)
         
@@ -878,6 +881,9 @@ async def payment_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await start(update, context)
         return
     
+    # Clear search state
+    USER_STATES.pop(user.id, None)
+    
     await payment_system.show_payment_menu(update, context)
 
 async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -887,6 +893,9 @@ async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not db.user_exists(user.id):
         await start(update, context)
         return
+    
+    # Clear search state
+    USER_STATES.pop(user.id, None)
     
     await referral_system.show_referral_info(update, context)
 
