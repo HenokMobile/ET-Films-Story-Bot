@@ -2,8 +2,23 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends a simple help message."""
-    await update.message.reply_text("ℹ️ ለተጨማሪ እገዛ እኛን ያግኙ ➲ @Henok_Chat ✅")
+    """Sends usage menu with inline keyboard."""
+    keyboard = [
+        [InlineKeyboardButton("🎬 የፊልም ፍለጋ", callback_data='usage_film_search')],
+        [InlineKeyboardButton("💰 የገቢ ማድረግ", callback_data='usage_payment')],
+        [InlineKeyboardButton("🎁 የመጋበዝ መረጃ", callback_data='usage_referral')],
+        [InlineKeyboardButton("❓ FAQ", callback_data='usage_faq')],
+        [InlineKeyboardButton("📞 እገዛ & ድጋፍ", callback_data='usage_help')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    sent_message = await update.message.reply_text(
+        '📚 የአጠቃቀም መመሪያ & መረጃ\n\nእባክዎ ከታች ካሉት አማራጮች በመምረጥ ዝርዝር መረጃ ያግኙ።',
+        reply_markup=reply_markup
+    )
+
+    # Store the message ID in user_data to delete it later
+    context.user_data['usage_message_id'] = sent_message.message_id
 
 async def handle_usage_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends a message with inline keyboard for usage instructions and stores its ID."""
