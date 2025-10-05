@@ -123,6 +123,7 @@ class ReferralSystem:
     
     async def show_referral_info(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show referral link and statistics for the referrer"""
+        from bot import get_main_keyboard
         user = update.effective_user
         
         try:
@@ -137,7 +138,8 @@ class ReferralSystem:
             if not bot_username:
                 logger.error(f"Bot username is None or empty! Bot info: {bot_info}")
                 await update.message.reply_text(
-                    "❌ የBot መረጃ ማግኘት አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
+                    "❌ የBot መረጃ ማግኘት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
+                    reply_markup=get_main_keyboard()
                 )
                 return
             
@@ -192,10 +194,17 @@ class ReferralSystem:
                 reply_markup=reply_markup
             )
             
+            # Send main menu keyboard separately
+            await update.message.reply_text(
+                "🏠 ዋና ምናሌ:",
+                reply_markup=get_main_keyboard()
+            )
+            
         except Exception as e:
             logger.error(f"Error showing referral info: {e}")
             await update.message.reply_text(
-                "❌ የግብዣ መረጃ ማሳየት አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
+                "❌ የግብዣ መረጃ ማሳየት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
+                reply_markup=get_main_keyboard()
             )
 
 referral_system = ReferralSystem()

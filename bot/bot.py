@@ -64,10 +64,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         USER_STATES[user.id] = WAITING_FOR_CONTACT
     else:
+        # Clear search state
+        USER_STATES.pop(user.id, None)
+        
+        # Clear search results from context
+        if 'last_movie_results' in context.user_data:
+            del context.user_data['last_movie_results']
+        if 'last_series_results' in context.user_data:
+            del context.user_data['last_series_results']
+        if 'last_all_results' in context.user_data:
+            del context.user_data['last_all_results']
+        if 'movie_search_query' in context.user_data:
+            del context.user_data['movie_search_query']
+        if 'series_search_query' in context.user_data:
+            del context.user_data['series_search_query']
+        if 'all_search_query' in context.user_data:
+            del context.user_data['all_search_query']
+        
         # Existing user
         await update.message.reply_text(
             f"⚪️ እንደገና እንኳን ደህና መጡ! {user.first_name}\n\n"
-            "☢️ እባክዎ የምትፈልገው ነገር ከታች ይምረጡ።👇",
+            "☢️ እባክዎ የምትፈልገው ነገር ከታች ይምረጡ।👇",
             reply_markup=get_main_keyboard()
         )
 
@@ -896,6 +913,20 @@ async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Clear search state
     USER_STATES.pop(user.id, None)
+    
+    # Clear search results from context
+    if 'last_movie_results' in context.user_data:
+        del context.user_data['last_movie_results']
+    if 'last_series_results' in context.user_data:
+        del context.user_data['last_series_results']
+    if 'last_all_results' in context.user_data:
+        del context.user_data['last_all_results']
+    if 'movie_search_query' in context.user_data:
+        del context.user_data['movie_search_query']
+    if 'series_search_query' in context.user_data:
+        del context.user_data['series_search_query']
+    if 'all_search_query' in context.user_data:
+        del context.user_data['all_search_query']
     
     await referral_system.show_referral_info(update, context)
 
