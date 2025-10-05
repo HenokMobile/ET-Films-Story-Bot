@@ -34,20 +34,8 @@ class ReferralSystem:
             db.add_referral_earnings(referrer_id, self.reward_amount)
             
             referrer_stats = db.get_referral_stats(referrer_id)
-            # Get bot info to get username
-            bot_info = await context.bot.get_me()
-            logger.info(f"DEBUG: Bot info = {bot_info}")
-            logger.info(f"DEBUG: Bot username = {bot_info.username if bot_info else 'bot_info is None'}")
             
-            bot_username = bot_info.username if bot_info else None
-            
-            # Validate bot username
-            if not bot_username:
-                logger.error(f"Bot username is None or empty! Bot info: {bot_info}")
-                return False
-            
-            new_user_invite_link = f"https://t.me/{bot_username}?start=invite_{new_user_id}"
-            
+            # Send notification to referrer
             await context.bot.send_message(
                 chat_id=referrer_id,
                 text=f"🎉 እንኳን ደስ አለዎ!\n\n"
@@ -55,63 +43,6 @@ class ReferralSystem:
                      f"💰 ሽልማት: +{self.reward_amount} ብር\n"
                      f"👥 ጠቅላላ ግብዣዎች: {referrer_stats['referral_count']}\n"
                      f"💵 ጠቅላላ ገቢ: {referrer_stats['total_earnings']} ብር"
-            )
-            
-            welcome_message = (
-                f"🎬 *ET Films Story Bot - ሁሉም ፊልም በአንድ ቦታ!* 🎥\n\n"
-                f"━━━━━━━━━━━━━━━━━━━\n\n"
-                f"🌍 *ከየትኛው ሀገር ፊልም ብትፈልግ!*\n"
-                f"🎬 Hollywood • Bollywood • Korean\n"
-                f"🇪🇹 Ethiopian • Turkish • Egyptian\n"
-                f"🌍 African • European • Chinese... *እና ሌሎች!*\n\n"
-                f"🎭 *ማንኛውም የፊልም ዓይነት!*\n"
-                f"⚔️ Action • 😂 Comedy • ❤️ Romance\n"
-                f"👻 Horror • 🚀 Sci-Fi • 🦸 Superhero\n"
-                f"🎨 Animation • 📚 Documentary... *እና ሌሎች!*\n\n"
-                f"✅ *በአማርኛ ትርጉም ያለው እና ያለትርጉም በሁለቱም!*\n\n"
-                f"━━━━━━━━━━━━━━━━━━━\n\n"
-                f"💰 *ጓደኞችን አምጣ - ገንዘብ አግኝ!*\n"
-                f"🎁 *እያንዳንዱ ጓደኛ = {self.reward_amount} ብር ነፃ!*\n\n"
-                f"━━━━━━━━━━━━━━━━━━━\n\n"
-                f"📱 *የእርስዎ የግብዣ ሊንክ:*\n"
-                f"`{new_user_invite_link}`\n\n"
-                f"👇 *ቀጥሎ ያለውን ቁልፍ ይጠቀሙ ለመጋራት!*"
-            )
-            
-            import urllib.parse
-            
-            share_message_new_text = (
-                "🎬 ET Films Story Bot - ሁሉም ፊልም በአንድ ቦታ! 🎥\n\n"
-                "━━━━━━━━━━━━━━━━━━━\n\n"
-                "🌍 ከየትኛው ሀገር ፊልም ብትፈልግ!\n"
-                "🎬 Hollywood • Bollywood • Korean\n"
-                "🇪🇹 Ethiopian • Turkish • Egyptian\n"
-                "🌍 African • European • Chinese... እና ሌሎች!\n\n"
-                "🎭 ማንኛውም የፊልም ዓይነት!\n"
-                "⚔️ Action • 😂 Comedy • ❤️ Romance\n"
-                "👻 Horror • 🚀 Sci-Fi • 🦸 Superhero\n"
-                "🎨 Animation • 📚 Documentary... እና ሌሎች!\n\n"
-                "✅ በአማርኛ ትርጉም እና ያለትርጉም በሁለቱም!\n\n"
-                "━━━━━━━━━━━━━━━━━━━\n"
-                "➲ ይህን Link በመንካት ይግቡ👇\n\n"
-                f"➽🔗 {new_user_invite_link} 🔗\n\n"
-                "━━━━━━━━━━━━━━━━━━━\n\n"
-                "🍿 አሁኑኑ ይግቡ በተለያዩ ፊልም ይደሰቱ።\n"
-                "እናመሰግናለን፣ ET Films Story Bot 🎥"
-            )
-            
-            share_url_new = f"https://t.me/share/url?url={urllib.parse.quote(new_user_invite_link)}&text={urllib.parse.quote(share_message_new_text)}"
-            
-            keyboard = [
-                [InlineKeyboardButton("📤 ሊንክን ለጓደኞች ላክ", url=share_url_new)]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await context.bot.send_message(
-                chat_id=new_user_id,
-                text=welcome_message,
-                parse_mode='Markdown',
-                reply_markup=reply_markup
             )
             
             logger.info(f"Referral processed: User {new_user_id} referred by {referrer_id}. Reward: {self.reward_amount} Birr")
