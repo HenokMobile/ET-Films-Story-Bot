@@ -41,7 +41,7 @@ def get_main_keyboard():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start command handler"""
     user = update.effective_user
-
+    
     referrer_id = None
     if context.args and len(context.args) > 0:
         arg = context.args[0]
@@ -85,7 +85,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
             first_name=user.first_name,
             last_name=user.last_name
         )
-
+        
         pending_referrer = context.user_data.get('pending_referrer')
         if pending_referrer:
             await referral_system.process_referral(user.id, pending_referrer, context)
@@ -120,7 +120,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Periodic cleanup of old search results to prevent memory leaks
     if 'last_cleanup' not in context.user_data:
         context.user_data['last_cleanup'] = 0
-
+    
     import time
     current_time = time.time()
     if current_time - context.user_data.get('last_cleanup', 0) > 3600:  # Every hour
@@ -145,7 +145,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await admin_balance.handle_admin_message(update, context)
             except Exception as e:
                 logger.error(f"Admin message handling error: {e}")
-
+        
         asyncio.create_task(handle_admin_isolated())
 
     # Clean up any existing inline keyboards when user sends new message
@@ -166,7 +166,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "⬅️ ለመመለስ":
         # Clear user state
         USER_STATES.pop(user.id, None)
-
+        
         # Clear search results from context
         if 'last_movie_results' in context.user_data:
             del context.user_data['last_movie_results']
@@ -176,11 +176,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del context.user_data['movie_search_query']
         if 'series_search_query' in context.user_data:
             del context.user_data['series_search_query']
-
+        
         # Clear any tracked inline messages
         if 'last_inline_messages' in context.user_data and user.id in context.user_data['last_inline_messages']:
             del context.user_data['last_inline_messages'][user.id]
-
+        
         await update.message.reply_text(
             "ዋና ምናሌ 🏠",
             reply_markup=get_main_keyboard()
@@ -192,7 +192,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Create back button keyboard
         back_keyboard = [[KeyboardButton("⬅️ ለመመለስ")]]
         back_reply_markup = ReplyKeyboardMarkup(back_keyboard, resize_keyboard=True)
-
+        
         await update.message.reply_text(
             "የምፈልጉትን ነጠላ ፊልም ስም ይጻፉ:",
             reply_markup=back_reply_markup
@@ -203,7 +203,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Create back button keyboard
         back_keyboard = [[KeyboardButton("⬅️ ለመመለስ")]]
         back_reply_markup = ReplyKeyboardMarkup(back_keyboard, resize_keyboard=True)
-
+        
         await update.message.reply_text(
             "የምፈልጉትን ተከታታይ ፊልም ስም ይጻፉ:",
             reply_markup=back_reply_markup
@@ -214,7 +214,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Create back button keyboard
         back_keyboard = [[KeyboardButton("⬅️ ለመመለስ")]]
         back_reply_markup = ReplyKeyboardMarkup(back_keyboard, resize_keyboard=True)
-
+        
         await update.message.reply_text(
             "የምፈልጉትን ፊልም ስም ይጻፉ (ነጠላ ወይም ተከታታይ):",
             reply_markup=back_reply_markup
@@ -226,7 +226,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             # Get user balance from database
             user_balance = db.get_user_balance(user.id)
-
+            
             # Convert to integer safely
             if user_balance is None:
                 balance_amount = 0
@@ -236,7 +236,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except (ValueError, TypeError):
                     logger.error(f"Invalid balance value for user {user.id}: {user_balance}")
                     balance_amount = 0
-
+            
             await update.message.reply_text(
                 f"💰 የእርስዎ ሒሳብ መጠን\n\n"
                 f"💵 ያለዎት ገንዘብ: {balance_amount:,} ብር\n\n"
@@ -244,7 +244,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=get_main_keyboard()
             )
             logger.info(f"Balance displayed for user {user.id}: {balance_amount} ብር")
-
+            
         except Exception as e:
             logger.error(f"Error showing balance for user {user.id}: {e}", exc_info=True)
             await update.message.reply_text(
@@ -268,7 +268,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text in ["📱 Telebirr", "🏦 CBE", "🌐 CBEbirr", "💳 Card"]:
         method_map = {
             "📱 Telebirr": "Telebirr",
-            "🏦 CBE": "CBE",
+            "🏦 CBE": "CBE", 
             "🌐 CBEbirr": "CBEbirr",
             "💳 Card": "Card"
         }
@@ -295,7 +295,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=get_main_keyboard()
                 )
                 return
-
+        
         # If not in payment session, handle normally
         await update.message.reply_text(
             "ዋና ምናሌ 🏠",
@@ -340,7 +340,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         session = payment_system.payment_sessions.get(user.id)
         if session:
             current_step = session['step']
-
+            
             if current_step == 'phone':
                 await payment_system.process_input(update, context, 'phone', text)
             elif current_step == 'account':
@@ -358,7 +358,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle photo uploads for payment screenshots"""
     user_id = update.effective_user.id
-
+    
     # Check if user is in payment session and expecting screenshot
     session = payment_system.payment_sessions.get(user_id)
     if session and session['step'] == 'screenshot':
@@ -409,7 +409,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 display_title = display_name[:45] + "..." if len(display_name) > 45 else display_name
                 emoji = "🎬" if film_type == "movie" else "📽"
                 keyboard.append([InlineKeyboardButton(
-                    f"{emoji} {display_title}",
+                    f"{emoji} {display_title}", 
                     callback_data=f"all_{film_type}_{start_idx + i}"
                 )])
 
@@ -445,9 +445,9 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             parts = data.split("_")
             film_type = parts[1]  # "movie" or "series"
             index = int(parts[2])
-
+            
             user_id = query.from_user.id
-
+            
             # Get the last search results from context
             if 'last_all_results' in context.user_data:
                 results = context.user_data['last_all_results']
@@ -458,7 +458,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     # Check user balance
                     PRICE = 3 if film_type == "movie" else 2
                     user_balance = db.get_user_balance(user_id)
-
+                    
                     if user_balance < PRICE:
                         await query.answer(
                             f"❌ በቂ ሂሳብ የለዎትም!\n\n"
@@ -468,7 +468,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                             show_alert=True
                         )
                         return
-
+                    
                     # Deduct balance
                     import sqlite3
                     conn = sqlite3.connect(config.USER_DB_PATH)
@@ -486,12 +486,12 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                         chat_id=query.message.chat.id,
                         document=file_id
                     )
-
+                    
                     # Log download
                     db.log_download(user_id, file_id, film_type, file_name)
-
+                    
                     await query.answer(f"✅ {PRICE} ብር ተከፍሏል!")
-
+                    
                     # Clear user state and return to main menu
                     USER_STATES.pop(user_id, None)
                     await context.bot.send_message(
@@ -552,7 +552,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 display_name = file_name if file_name else (file_title if file_title else f"ፋይል {start_idx + i + 1}")
                 display_title = display_name[:50] + "..." if len(display_name) > 50 else display_name
                 keyboard.append([InlineKeyboardButton(
-                    f"🎬 {display_title}",
+                    f"🎬 {display_title}", 
                     callback_data=f"movie_{start_idx + i}"
                 )])
 
@@ -582,7 +582,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             await query.answer("❌ ስህተት ተፈጥሯል!", show_alert=True)
         return
 
-    # Handle series pagination
+    # Handle series pagination  
     elif data.startswith("series_prev_") or data.startswith("series_next_"):
         from telegram import InlineKeyboardMarkup, InlineKeyboardButton
         try:
@@ -618,7 +618,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 display_name = file_name if file_name else (file_title if file_title else f"ፋይል {start_idx + i + 1}")
                 display_title = display_name[:50] + "..." if len(display_name) > 50 else display_name
                 keyboard.append([InlineKeyboardButton(
-                    f"📽 {display_title}",
+                    f"📽 {display_title}", 
                     callback_data=f"series_{start_idx + i}"
                 )])
 
@@ -653,7 +653,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             index = int(data.replace("movie_", ""))
             user_id = query.from_user.id
-
+            
             # Get the last search results from context
             if 'last_movie_results' in context.user_data:
                 results = context.user_data['last_movie_results']
@@ -664,7 +664,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     # Check user balance - 3 birr for single movie
                     MOVIE_PRICE = 3
                     user_balance = db.get_user_balance(user_id)
-
+                    
                     if user_balance < MOVIE_PRICE:
                         await query.answer(
                             f"❌ በቂ ሂሳብ የለዎትም!\n\n"
@@ -674,14 +674,14 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                             show_alert=True
                         )
                         return
-
+                    
                     # Deduct balance
                     import sqlite3
                     conn = sqlite3.connect(config.USER_DB_PATH)
                     conn.execute('UPDATE users SET balance = balance - ? WHERE user_id = ?', (MOVIE_PRICE, user_id))
                     conn.commit()
                     conn.close()
-
+                    
                     new_balance = user_balance - MOVIE_PRICE
 
                     # Delete the inline keyboard message completely
@@ -694,12 +694,12 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                         chat_id=query.message.chat.id,
                         document=file_id
                     )
-
+                    
                     # Log download
                     db.log_download(user_id, file_id, "movie", file_name)
-
+                    
                     await query.answer(f"✅ {MOVIE_PRICE} ብር ተከፍሏል!")
-
+                    
                     # Clear user state and return to main menu
                     USER_STATES.pop(user_id, None)
                     await context.bot.send_message(
@@ -730,7 +730,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             index = int(data.replace("series_", ""))
             user_id = query.from_user.id
-
+            
             # Get the last search results from context
             if 'last_series_results' in context.user_data:
                 results = context.user_data['last_series_results']
@@ -741,7 +741,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     # Check user balance - 2 birr for series episode
                     SERIES_PRICE = 2
                     user_balance = db.get_user_balance(user_id)
-
+                    
                     if user_balance < SERIES_PRICE:
                         await query.answer(
                             f"❌ በቂ ሂሳብ የለዎትም!\n\n"
@@ -751,14 +751,14 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                             show_alert=True
                         )
                         return
-
+                    
                     # Deduct balance
                     import sqlite3
                     conn = sqlite3.connect(config.USER_DB_PATH)
                     conn.execute('UPDATE users SET balance = balance - ? WHERE user_id = ?', (SERIES_PRICE, user_id))
                     conn.commit()
                     conn.close()
-
+                    
                     new_balance = user_balance - SERIES_PRICE
 
                     # Delete the inline keyboard message completely
@@ -771,12 +771,12 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                         chat_id=query.message.chat.id,
                         document=file_id
                     )
-
+                    
                     # Log download
                     db.log_download(user_id, file_id, "series", file_name)
-
+                    
                     await query.answer(f"✅ {SERIES_PRICE} ብር ተከፍሏል!")
-
+                    
                     # Clear user state and return to main menu
                     USER_STATES.pop(user_id, None)
                     await context.bot.send_message(
@@ -810,11 +810,11 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
     # Handle admin balance callbacks
     from admin_balance import admin_balance
-    if data in ["admin_finance", "user_management", "pending_payments", "successful_payments",
-                "failed_payments", "payment_reports", "search_payment_by_id", "search_by_id", "search_by_username",
+    if data in ["admin_finance", "user_management", "pending_payments", "successful_payments", 
+                "failed_payments", "payment_reports", "search_payment_by_id", "search_by_id", "search_by_username", 
                 "search_by_phone", "report_daily", "report_weekly", "report_monthly", "report_yearly"] or \
-       data.startswith(("pending_page_", "successful_page_", "failed_page_", "approve_",
-                       "reject_", "view_payment_", "details_", "add_balance_", "reduce_balance_", "user_history_",
+       data.startswith(("pending_page_", "successful_page_", "failed_page_", "approve_", 
+                       "reject_", "view_payment_", "details_", "add_balance_", "reduce_balance_", "user_history_", 
                        "history_page_", "back_to_user_")):
         await admin_balance.handle_callback_query(query, context)
         return
@@ -910,12 +910,12 @@ async def main():
     """Start the bot"""
     import asyncio
     import signal
-
+    
     print("🤖 Telegram bot እየጀመር ነው...")
-
+    
     # Create application with conflict resolution
     application = Application.builder().token(config.BOT_TOKEN).build()
-
+    
     # Set up error handling for conflicts
     application.add_error_handler(handle_bot_error)
 
@@ -923,11 +923,6 @@ async def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("henok", admin_command))
-    application.add_handler(CommandHandler("balance", balance_command))
-    application.add_handler(CommandHandler("payment", payment_command))
-    application.add_handler(CommandHandler("referral", referral_command))
-    application.add_handler(CommandHandler("series", series_command))
-    application.add_handler(CommandHandler("single", single_command))
     application.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     application.add_handler(CallbackQueryHandler(handle_usage_callbacks, pattern='^usage_'))
@@ -936,27 +931,27 @@ async def main():
 
     # Add channel post handler with proper filter
     application.add_handler(MessageHandler(
-        (filters.Document.ALL | filters.VIDEO) & filters.ChatType.CHANNEL,
+        (filters.Document.ALL | filters.VIDEO) & filters.ChatType.CHANNEL, 
         handle_channel_post
     ))
 
     # Initialize the application
     await application.initialize()
-
+    
     # Start polling with conflict handling
     try:
         await application.start()
-
+        
         # Wait a moment before starting polling
         await asyncio.sleep(2)
-
+        
         await application.updater.start_polling(
             allowed_updates=Update.ALL_TYPES,
             drop_pending_updates=True  # Drop pending updates to avoid conflicts
         )
-
+        
         print("✅ Bot started successfully! 🎬")
-
+        
     except Exception as e:
         if "Conflict" in str(e):
             print("❌ አንድ ተጨማሪ Bot instance እየሮጠ ነው! እባክዎ አቁመው ይሞክሩ።")
@@ -964,18 +959,18 @@ async def main():
         else:
             logger.error(f"Error starting bot: {e}")
             raise
-
+    
     # Keep the application running
     try:
         # Handle shutdown gracefully
         stop_signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
         for sig in stop_signals:
             signal.signal(sig, lambda s, f: asyncio.create_task(shutdown(application)))
-
+        
         # Keep running
         while True:
             await asyncio.sleep(1)
-
+            
     except KeyboardInterrupt:
         print("🛑 Bot stopped by user")
     finally:
@@ -1005,9 +1000,9 @@ async def shutdown(application):
         await asyncio.wait_for(application.updater.stop(), timeout=10)
         await asyncio.wait_for(application.stop(), timeout=5)
         await asyncio.wait_for(application.shutdown(), timeout=5)
-
+        
         # Bot cleanup completed
-
+            
     except asyncio.TimeoutError:
         logger.warning("⚠️ Shutdown timeout - forcing stop")
     except Exception as e:
