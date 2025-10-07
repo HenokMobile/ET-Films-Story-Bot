@@ -26,12 +26,12 @@ class SeriesManager:
                     added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
-            
+
             # Migration: Add file_size column if it doesn't exist
             cursor = conn.cursor()
             cursor.execute("PRAGMA table_info(series)")
             columns = [col[1] for col in cursor.fetchall()]
-            
+
             if 'file_size' not in columns:
                 logger.info("🔧 Migration: Adding file_size column to series table")
                 conn.execute('ALTER TABLE series ADD COLUMN file_size INTEGER DEFAULT 0')
@@ -48,16 +48,17 @@ class SeriesManager:
                     SELECT id FROM series 
                     WHERE file_name = ? AND file_size = ? AND file_size > 0
                 ''', (file_name, file_size))
-                
+
                 if cursor.fetchone() and file_size > 0:
                     logger.warning(f"Duplicate series ignored: {file_name} ({file_size} bytes)")
                     return False
-                
+
                 conn.execute('''
                     INSERT OR REPLACE INTO series 
                     (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''', (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size))
+                conn.commit()  # Commit after insertion
                 logger.info(f"Series added: {file_name} ({file_size} bytes)")
                 return True
         except Exception as e:
@@ -117,6 +118,44 @@ class SeriesManager:
         except Exception as e:
             logger.error(f"Error getting series count: {e}")
             return 0
+
+    async def save_to_database(self, file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size):
+        """Save series to database with duplicate checking - BLOCKS duplicates"""
+        try:
+            with sqlite3.connect(config.SERIES_DB_PATH) as conn:
+                cursor = conn.cursor()
+
+                # Check for exact duplicate by name and size BEFORE inserting
+                cursor.execute('''
+                    SELECT id, file_name, file_size FROM series 
+                    WHERE file_name = ? AND file_size = ? AND file_size > 0
+                ''', (file_name, file_size))
+
+                existing = cursor.fetchone()
+
+                if existing and file_size > 0:
+                    logger.warning(f"🚫 Duplicate BLOCKED from database: {file_name} ({file_size} bytes)")
+                    return existing[0], True  # Return existing ID and duplicate flag - DO NOT INSERT
+
+                # Only insert if NOT duplicate
+                cursor.execute('''
+                    INSERT INTO series 
+                    (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size))
+
+                conn.commit()
+                new_id = cursor.lastrowid
+                logger.info(f"✅ Series saved: {file_name} (ID: {new_id})")
+                return new_id, False  # Return new ID and not duplicate
+
+        except sqlite3.IntegrityError as e:
+            logger.error(f"Database integrity error: {e}")
+            return None, False
+        except Exception as e:
+            logger.error(f"Error saving series: {e}")
+            return None, False
+
 
 async def handle_series_search(update: Update, context: ContextTypes.DEFAULT_TYPE, query: str, page: int = 0):
     """Handle series search and show results in inline keyboard with pagination"""
@@ -205,7 +244,7 @@ async def send_duplicate_notification(bot, file_name, file_size, content_type="S
     """Send duplicate notification to admin (Part 2 & 3)"""
     try:
         size_mb = file_size / (1024 * 1024)
-        
+
         # Part 2: Channel Delete Notification
         delete_msg = (
             "🗑️ *Duplicate Deleted from Channel!*\n\n"
@@ -215,7 +254,7 @@ async def send_duplicate_notification(bot, file_name, file_size, content_type="S
             "⚠️ ምክንያት: በDatabase ውስጥ አስቀድሞ አለ\n"
             "   (ተመሳሳይ ስም \\+ ተመሳሳይ መጠን)"
         )
-        
+
         # Part 3: Database Duplicate Alert
         db_alert_msg = (
             "⚠️ *Database Duplicate Detected!*\n\n"
@@ -224,22 +263,22 @@ async def send_duplicate_notification(bot, file_name, file_size, content_type="S
             "❌ በDatabase አልተቀመጠም\n"
             "✅ ከChannel ተሰርዟል"
         )
-        
+
         # Send both notifications
         await bot.send_message(
             chat_id=config.ADMIN_USER_ID,
             text=delete_msg,
             parse_mode='Markdown'
         )
-        
+
         await bot.send_message(
             chat_id=config.ADMIN_USER_ID,
             text=db_alert_msg,
             parse_mode='Markdown'
         )
-        
+
         logger.info(f"✅ Duplicate notifications sent to admin for: {file_name}")
-        
+
     except Exception as e:
         logger.error(f"❌ Error sending duplicate notification: {e}")
 
@@ -265,15 +304,15 @@ async def handle_series_channel_post(message, channel_id):
             import sqlite3
             with sqlite3.connect(config.SERIES_DB_PATH) as conn:
                 cursor = conn.cursor()
-                
+
                 # Check for exact match (name + size) OR legacy match (name + size=0)
                 cursor.execute('''
                     SELECT id, file_size FROM series 
                     WHERE file_name = ? AND (file_size = ? OR file_size = 0)
                 ''', (file_data['file_name'], file_data['file_size']))
-                
+
                 existing = cursor.fetchone()
-                
+
                 if existing:
                     # If existing entry has size=0, update it with new size
                     if existing[1] == 0:
@@ -285,19 +324,19 @@ async def handle_series_channel_post(message, channel_id):
                         ''', (file_data['file_size'], existing[0]))
                         conn.commit()
                         logger.info(f"✅ Updated file size to {file_data['file_size']} bytes")
-                    
+
                     # Delete from channel (duplicate regardless of size match)
                     try:
                         from telegram import Bot
                         bot = Bot(token=config.BOT_TOKEN)
-                        
+
                         await bot.delete_message(
                             chat_id=channel_id,
                             message_id=message.message_id
                         )
-                        
+
                         logger.info(f"🗑️ Deleted duplicate from channel: {file_data['file_name']}")
-                        
+
                         # Send admin notifications (Part 2 & 3)
                         await send_duplicate_notification(
                             bot, 
@@ -305,17 +344,27 @@ async def handle_series_channel_post(message, channel_id):
                             file_data['file_size'],
                             "Series"
                         )
-                        
+
                         return False  # Don't save to database
-                        
+
                     except Exception as e:
                         logger.error(f"❌ Error deleting duplicate from channel: {e}")
 
-        success = series_manager.add_series(**file_data)
-        if success:
-            logger.info(f"Added new series: {file_data['file_name']} ({file_data['file_size']} bytes)")
+        # Use the modified save_to_database method
+        # It returns (id, is_duplicate)
+        new_id, is_duplicate = await series_manager.save_to_database(**file_data)
 
-        return success
+        if is_duplicate:
+            # If it's a duplicate, it means save_to_database handled the blocking and notifications
+            # We just need to ensure it's not added again and return False
+            return False
+        elif new_id is not None:
+            logger.info(f"Added new series: {file_data['file_name']} ({file_data['file_size']} bytes)")
+            return True # Successfully saved to DB
+        else:
+            # Handle cases where save_to_database failed for reasons other than duplication
+            logger.error(f"Failed to save series to DB: {file_data['file_name']}")
+            return False
 
     return False
 

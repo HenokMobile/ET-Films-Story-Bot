@@ -27,12 +27,12 @@ class SingleMovieManager:
                     added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
-            
+
             # Migration: Add file_size column if it doesn't exist
             cursor = conn.cursor()
             cursor.execute("PRAGMA table_info(single_movies)")
             columns = [col[1] for col in cursor.fetchall()]
-            
+
             if 'file_size' not in columns:
                 logger.info("🔧 Migration: Adding file_size column to single_movies table")
                 conn.execute('ALTER TABLE single_movies ADD COLUMN file_size INTEGER DEFAULT 0')
@@ -49,11 +49,11 @@ class SingleMovieManager:
                     SELECT id FROM single_movies 
                     WHERE file_name = ? AND file_size = ? AND file_size > 0
                 ''', (file_name, file_size))
-                
+
                 if cursor.fetchone() and file_size > 0:
                     logger.warning(f"Duplicate movie ignored: {file_name} ({file_size} bytes)")
                     return False
-                
+
                 conn.execute('''
                     INSERT OR REPLACE INTO single_movies 
                     (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size)
@@ -103,6 +103,44 @@ class SingleMovieManager:
         except Exception as e:
             logger.error(f"Error getting movies count: {e}")
             return 0
+
+    async def save_to_database(self, file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size):
+        """Save single movie to database with duplicate checking - BLOCKS duplicates"""
+        try:
+            with sqlite3.connect(config.SINGLE_DB_PATH) as conn:
+                cursor = conn.cursor()
+
+                # Check for exact duplicate by name and size BEFORE inserting
+                cursor.execute('''
+                    SELECT id, file_name, file_size FROM single_movies 
+                    WHERE file_name = ? AND file_size = ? AND file_size > 0
+                ''', (file_name, file_size))
+
+                existing = cursor.fetchone()
+
+                if existing and file_size > 0:
+                    logger.warning(f"🚫 Duplicate BLOCKED from database: {file_name} ({file_size} bytes)")
+                    return existing[0], True  # Return existing ID and duplicate flag - DO NOT INSERT
+
+                # Only insert if NOT duplicate
+                cursor.execute('''
+                    INSERT INTO single_movies 
+                    (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size))
+
+                conn.commit()
+                new_id = cursor.lastrowid
+                logger.info(f"✅ Movie saved: {file_name} (ID: {new_id})")
+                return new_id, False  # Return new ID and not duplicate
+
+        except sqlite3.IntegrityError as e:
+            logger.error(f"Database integrity error: {e}")
+            return None, False
+        except Exception as e:
+            logger.error(f"Error saving movie: {e}")
+            return None, False
+
 
 async def handle_movie_search(update: Update, context: ContextTypes.DEFAULT_TYPE, query: str, page: int = 0):
     """Handle movie search and show results in inline keyboard with pagination"""
@@ -192,7 +230,7 @@ async def send_duplicate_notification(bot, file_name, file_size, content_type="S
     """Send duplicate notification to admin (Part 2 & 3)"""
     try:
         size_mb = file_size / (1024 * 1024)
-        
+
         # Part 2: Channel Delete Notification
         delete_msg = (
             "🗑️ *Duplicate Deleted from Channel!*\n\n"
@@ -202,7 +240,7 @@ async def send_duplicate_notification(bot, file_name, file_size, content_type="S
             "⚠️ ምክንያት: በDatabase ውስጥ አስቀድሞ አለ\n"
             "   (ተመሳሳይ ስም \\+ ተመሳሳይ መጠን)"
         )
-        
+
         # Part 3: Database Duplicate Alert
         db_alert_msg = (
             "⚠️ *Database Duplicate Detected!*\n\n"
@@ -211,22 +249,22 @@ async def send_duplicate_notification(bot, file_name, file_size, content_type="S
             "❌ በDatabase አልተቀመጠም\n"
             "✅ ከChannel ተሰርዟል"
         )
-        
+
         # Send both notifications
         await bot.send_message(
             chat_id=config.ADMIN_USER_ID,
             text=delete_msg,
             parse_mode='Markdown'
         )
-        
+
         await bot.send_message(
             chat_id=config.ADMIN_USER_ID,
             text=db_alert_msg,
             parse_mode='Markdown'
         )
-        
+
         logger.info(f"✅ Duplicate notifications sent to admin for: {file_name}")
-        
+
     except Exception as e:
         logger.error(f"❌ Error sending duplicate notification: {e}")
 
@@ -252,15 +290,15 @@ async def handle_movie_channel_post(message, channel_id):
             import sqlite3
             with sqlite3.connect(config.SINGLE_DB_PATH) as conn:
                 cursor = conn.cursor()
-                
+
                 # Check for exact match (name + size) OR legacy match (name + size=0)
                 cursor.execute('''
                     SELECT id, file_size FROM single_movies 
                     WHERE file_name = ? AND (file_size = ? OR file_size = 0)
                 ''', (file_data['file_name'], file_data['file_size']))
-                
+
                 existing = cursor.fetchone()
-                
+
                 if existing:
                     # If existing entry has size=0, update it with new size
                     if existing[1] == 0:
@@ -272,19 +310,19 @@ async def handle_movie_channel_post(message, channel_id):
                         ''', (file_data['file_size'], existing[0]))
                         conn.commit()
                         logger.info(f"✅ Updated file size to {file_data['file_size']} bytes")
-                    
+
                     # Delete from channel (duplicate regardless of size match)
                     try:
                         from telegram import Bot
                         bot = Bot(token=config.BOT_TOKEN)
-                        
+
                         await bot.delete_message(
                             chat_id=channel_id,
                             message_id=message.message_id
                         )
-                        
+
                         logger.info(f"🗑️ Deleted duplicate from channel: {file_data['file_name']}")
-                        
+
                         # Send admin notifications (Part 2 & 3)
                         await send_duplicate_notification(
                             bot, 
@@ -292,17 +330,27 @@ async def handle_movie_channel_post(message, channel_id):
                             file_data['file_size'],
                             "Single Movie"
                         )
-                        
+
                         return False  # Don't save to database
-                        
+
                     except Exception as e:
                         logger.error(f"❌ Error deleting duplicate from channel: {e}")
 
-        success = movie_manager.add_single_movie(**file_data)
-        if success:
+        # If no duplicate found or file_size is 0, try to save to database
+        # The save_to_database function now handles the duplicate check BEFORE insertion
+        new_id, is_duplicate = await movie_manager.save_to_database(**file_data)
+        
+        if not is_duplicate and new_id:
             logger.info(f"Added new movie: {file_data['file_name']} ({file_data['file_size']} bytes)")
-
-        return success
+            return True
+        elif is_duplicate:
+            # This case should ideally not be reached if channel deletion is handled above,
+            # but it's a safeguard.
+            logger.warning(f"Duplicate movie detected but not blocked earlier: {file_data['file_name']}")
+            return False
+        else:
+            logger.error(f"Failed to save movie: {file_data['file_name']}")
+            return False
 
     return False
 
