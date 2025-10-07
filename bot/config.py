@@ -7,7 +7,7 @@ ADMIN_USER_ID = 6918848131  # Replace with your user ID
 
 # Channel IDs (to be set via admin panel)
 SINGLE_MOVIE_CHANNEL_IDS = [-1003169574565]
-SERIES_CHANNEL_IDS = [-1002955565679, -1003126657680]
+SERIES_CHANNEL_IDS = [-1002955565679]
 
 # Database paths
 SINGLE_DB_PATH = "single.db"
