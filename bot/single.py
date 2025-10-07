@@ -27,16 +27,27 @@ class SingleMovieManager:
                 )
             ''')
 
-    def add_single_movie(self, file_id, message_id, file_unique_id, file_name, file_title, channel_id):
+    def add_single_movie(self, file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size=0):
         """Add single movie to database"""
         try:
             with sqlite3.connect(config.SINGLE_DB_PATH) as conn:
+                # Check if duplicate exists by name and size
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT id FROM single_movies 
+                    WHERE file_name = ? AND file_size = ? AND file_size > 0
+                ''', (file_name, file_size))
+                
+                if cursor.fetchone() and file_size > 0:
+                    logger.warning(f"Duplicate movie ignored: {file_name} ({file_size} bytes)")
+                    return False
+                
                 conn.execute('''
                     INSERT OR REPLACE INTO single_movies 
-                    (file_id, message_id, file_unique_id, file_name, file_title, channel_id)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                ''', (file_id, message_id, file_unique_id, file_name, file_title, channel_id))
-                logger.info(f"Single movie added: {file_name}")
+                    (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size))
+                logger.info(f"Single movie added: {file_name} ({file_size} bytes)")
                 return True
         except Exception as e:
             logger.error(f"Error adding single movie: {e}")
@@ -178,12 +189,13 @@ async def handle_movie_channel_post(message, channel_id):
             'file_unique_id': file_obj.file_unique_id,
             'file_name': getattr(file_obj, 'file_name', '') or '',
             'file_title': message.caption or '',
-            'channel_id': channel_id
+            'channel_id': channel_id,
+            'file_size': getattr(file_obj, 'file_size', 0) or 0
         }
 
         success = movie_manager.add_single_movie(**file_data)
         if success:
-            logger.info(f"Added new movie: {file_data['file_name']}")
+            logger.info(f"Added new movie: {file_data['file_name']} ({file_data['file_size']} bytes)")
 
         return success
 

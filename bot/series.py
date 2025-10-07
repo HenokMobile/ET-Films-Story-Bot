@@ -26,16 +26,27 @@ class SeriesManager:
                 )
             ''')
 
-    def add_series(self, file_id, message_id, file_unique_id, file_name, file_title, channel_id):
+    def add_series(self, file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size=0):
         """Add series to database"""
         try:
             with sqlite3.connect(config.SERIES_DB_PATH) as conn:
+                # Check if duplicate exists by name and size
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT id FROM series 
+                    WHERE file_name = ? AND file_size = ? AND file_size > 0
+                ''', (file_name, file_size))
+                
+                if cursor.fetchone() and file_size > 0:
+                    logger.warning(f"Duplicate series ignored: {file_name} ({file_size} bytes)")
+                    return False
+                
                 conn.execute('''
                     INSERT OR REPLACE INTO series 
-                    (file_id, message_id, file_unique_id, file_name, file_title, channel_id)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                ''', (file_id, message_id, file_unique_id, file_name, file_title, channel_id))
-                logger.info(f"Series added: {file_name}")
+                    (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size))
+                logger.info(f"Series added: {file_name} ({file_size} bytes)")
                 return True
         except Exception as e:
             logger.error(f"Error adding series: {e}")
@@ -191,12 +202,13 @@ async def handle_series_channel_post(message, channel_id):
             'file_unique_id': file_obj.file_unique_id,
             'file_name': getattr(file_obj, 'file_name', '') or '',
             'file_title': message.caption or '',
-            'channel_id': channel_id
+            'channel_id': channel_id,
+            'file_size': getattr(file_obj, 'file_size', 0) or 0
         }
 
         success = series_manager.add_series(**file_data)
         if success:
-            logger.info(f"Added new series: {file_data['file_name']}")
+            logger.info(f"Added new series: {file_data['file_name']} ({file_data['file_size']} bytes)")
 
         return success
 

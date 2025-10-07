@@ -186,23 +186,47 @@ class DatabaseManager:
                 ''', (user_id, username, phone_number, first_name, last_name))
             conn.commit()
 
-    def add_single_movie(self, file_id, message_id, file_unique_id, file_name, file_title, channel_id):
+    def add_single_movie(self, file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size=0):
         """Add single movie to database"""
         with sqlite3.connect(config.SINGLE_DB_PATH) as conn:
+            # Check if duplicate exists by name and size
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id FROM single_movies 
+                WHERE file_name = ? AND file_size = ? AND file_size > 0
+            ''', (file_name, file_size))
+            
+            if cursor.fetchone() and file_size > 0:
+                logger.warning(f"Duplicate movie ignored: {file_name} ({file_size} bytes)")
+                return False
+            
             conn.execute('''
                 INSERT OR REPLACE INTO single_movies 
-                (file_id, message_id, file_unique_id, file_name, file_title, channel_id)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (file_id, message_id, file_unique_id, file_name, file_title, channel_id))
+                (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size))
+            return True
 
-    def add_series(self, file_id, message_id, file_unique_id, file_name, file_title, channel_id):
+    def add_series(self, file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size=0):
         """Add series to database"""
         with sqlite3.connect(config.SERIES_DB_PATH) as conn:
+            # Check if duplicate exists by name and size
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT id FROM series 
+                WHERE file_name = ? AND file_size = ? AND file_size > 0
+            ''', (file_name, file_size))
+            
+            if cursor.fetchone() and file_size > 0:
+                logger.warning(f"Duplicate series ignored: {file_name} ({file_size} bytes)")
+                return False
+            
             conn.execute('''
                 INSERT OR REPLACE INTO series 
-                (file_id, message_id, file_unique_id, file_name, file_title, channel_id)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (file_id, message_id, file_unique_id, file_name, file_title, channel_id))
+                (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size))
+            return True
 
     def search_single_movies(self, query):
         """Search single movies by name"""
