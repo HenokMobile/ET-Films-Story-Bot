@@ -1,6 +1,12 @@
 
 # Bot Configuration
-BOT_TOKEN = "8218337116:AAEkDugrX2LT_IozOcm8cieGdBX4hmP8NOg"
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 # Admin settings
 ADMIN_USER_ID = 6918848131  # Replace with your user ID
