@@ -1143,6 +1143,9 @@ async def main():
         
         print("✅ Bot started successfully! 🎬")
         
+        # Send startup message to admin
+        await send_startup_message_to_admin(application)
+        
     except Exception as e:
         if "Conflict" in str(e):
             print("❌ አንድ ተጨማሪ Bot instance እየሮጠ ነው! እባክዎ አቁመው ይሞክሩ።")
@@ -1181,6 +1184,41 @@ async def handle_bot_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Error occurred for user {update.effective_user.id}")
         if update and update.effective_message:
             logger.error(f"Message text: {update.effective_message.text[:100] if update.effective_message.text else 'N/A'}")
+
+async def send_startup_message_to_admin(application):
+    """Send startup notification to admin"""
+    try:
+        from series import SeriesManager
+        from single import SingleMovieManager
+        
+        # Instantiate managers
+        series_mgr = SeriesManager()
+        movie_mgr = SingleMovieManager()
+        
+        # Get database counts
+        series_count = series_mgr.get_series_count()
+        movies_count = movie_mgr.get_movies_count()
+        
+        startup_message = (
+            "🤖 *ET Films Bot ተጀምሯል!*\n\n"
+            f"✅ Series Database: {series_count:,} ፋይሎች\n"
+            f"✅ Single Movies Database: {movies_count:,} ፋይሎች\n"
+            f"✅ Duplicate Detection: ዝግጁ\n\n"
+            "💡 *Duplicate Prevention System:*\n"
+            "   • File\\_name + File\\_size 100% ተመሳሳይ ከሆነ:\n"
+            "      → ከChannel ይሰረዛል\n"
+            "      → ለእርስዎ ሪፖርት ይደረጋል"
+        )
+        
+        await application.bot.send_message(
+            chat_id=config.ADMIN_USER_ID,
+            text=startup_message,
+            parse_mode='Markdown'
+        )
+        logger.info(f"✅ Startup message sent to admin {config.ADMIN_USER_ID}")
+        
+    except Exception as e:
+        logger.error(f"❌ Error sending startup message: {e}")
 
 async def shutdown(application):
     """Gracefully shutdown the application"""

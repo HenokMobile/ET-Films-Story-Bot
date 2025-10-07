@@ -22,9 +22,21 @@ class SeriesManager:
                     file_name TEXT,
                     file_title TEXT,
                     channel_id INTEGER,
+                    file_size INTEGER DEFAULT 0,
                     added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+            
+            # Migration: Add file_size column if it doesn't exist
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(series)")
+            columns = [col[1] for col in cursor.fetchall()]
+            
+            if 'file_size' not in columns:
+                logger.info("🔧 Migration: Adding file_size column to series table")
+                conn.execute('ALTER TABLE series ADD COLUMN file_size INTEGER DEFAULT 0')
+                conn.commit()
+                logger.info("✅ Migration completed: file_size column added")
 
     def add_series(self, file_id, message_id, file_unique_id, file_name, file_title, channel_id, file_size=0):
         """Add series to database"""
@@ -189,6 +201,48 @@ async def handle_series_search(update: Update, context: ContextTypes.DEFAULT_TYP
         context.user_data['last_inline_messages'][user_id] = []
     context.user_data['last_inline_messages'][user_id].append(message.message_id)
 
+async def send_duplicate_notification(bot, file_name, file_size, content_type="Series"):
+    """Send duplicate notification to admin (Part 2 & 3)"""
+    try:
+        size_mb = file_size / (1024 * 1024)
+        
+        # Part 2: Channel Delete Notification
+        delete_msg = (
+            "🗑️ *Duplicate Deleted from Channel!*\n\n"
+            f"📁 ስም: `{file_name}`\n"
+            f"📏 መጠን: {size_mb:.2f} GB\n"
+            f"📂 ቻናል: {content_type}\n\n"
+            "⚠️ ምክንያት: በDatabase ውስጥ አስቀድሞ አለ\n"
+            "   (ተመሳሳይ ስም \\+ ተመሳሳይ መጠን)"
+        )
+        
+        # Part 3: Database Duplicate Alert
+        db_alert_msg = (
+            "⚠️ *Database Duplicate Detected!*\n\n"
+            f"📁 አዲስ: `{file_name}` ({size_mb:.2f} GB)\n"
+            f"💾 ያለው: `{file_name}` ({size_mb:.2f} GB)\n\n"
+            "❌ በDatabase አልተቀመጠም\n"
+            "✅ ከChannel ተሰርዟል"
+        )
+        
+        # Send both notifications
+        await bot.send_message(
+            chat_id=config.ADMIN_USER_ID,
+            text=delete_msg,
+            parse_mode='Markdown'
+        )
+        
+        await bot.send_message(
+            chat_id=config.ADMIN_USER_ID,
+            text=db_alert_msg,
+            parse_mode='Markdown'
+        )
+        
+        logger.info(f"✅ Duplicate notifications sent to admin for: {file_name}")
+        
+    except Exception as e:
+        logger.error(f"❌ Error sending duplicate notification: {e}")
+
 async def handle_series_channel_post(message, channel_id):
     """Handle new series posts in monitored channels"""
     series_manager = SeriesManager()
@@ -205,6 +259,57 @@ async def handle_series_channel_post(message, channel_id):
             'channel_id': channel_id,
             'file_size': getattr(file_obj, 'file_size', 0) or 0
         }
+
+        # Check if duplicate exists (100% match: name + size, or wildcard for legacy size=0)
+        if file_data['file_size'] > 0:
+            import sqlite3
+            with sqlite3.connect(config.SERIES_DB_PATH) as conn:
+                cursor = conn.cursor()
+                
+                # Check for exact match (name + size) OR legacy match (name + size=0)
+                cursor.execute('''
+                    SELECT id, file_size FROM series 
+                    WHERE file_name = ? AND (file_size = ? OR file_size = 0)
+                ''', (file_data['file_name'], file_data['file_size']))
+                
+                existing = cursor.fetchone()
+                
+                if existing:
+                    # If existing entry has size=0, update it with new size
+                    if existing[1] == 0:
+                        logger.info(f"📝 Updating legacy file size: {file_data['file_name']}")
+                        conn.execute('''
+                            UPDATE series 
+                            SET file_size = ? 
+                            WHERE id = ?
+                        ''', (file_data['file_size'], existing[0]))
+                        conn.commit()
+                        logger.info(f"✅ Updated file size to {file_data['file_size']} bytes")
+                    
+                    # Delete from channel (duplicate regardless of size match)
+                    try:
+                        from telegram import Bot
+                        bot = Bot(token=config.BOT_TOKEN)
+                        
+                        await bot.delete_message(
+                            chat_id=channel_id,
+                            message_id=message.message_id
+                        )
+                        
+                        logger.info(f"🗑️ Deleted duplicate from channel: {file_data['file_name']}")
+                        
+                        # Send admin notifications (Part 2 & 3)
+                        await send_duplicate_notification(
+                            bot, 
+                            file_data['file_name'], 
+                            file_data['file_size'],
+                            "Series"
+                        )
+                        
+                        return False  # Don't save to database
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Error deleting duplicate from channel: {e}")
 
         success = series_manager.add_series(**file_data)
         if success:
