@@ -1146,7 +1146,7 @@ async def main():
         
         await application.updater.start_polling(
             allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=False  # Keep pending updates to notify users
+            drop_pending_updates=True  # Drop pending updates - don't process messages sent while offline
         )
         
         print("✅ Bot started successfully! 🎬")
