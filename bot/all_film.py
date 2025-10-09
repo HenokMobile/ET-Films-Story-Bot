@@ -105,7 +105,7 @@ async def handle_all_film_search(update: Update, context: ContextTypes.DEFAULT_T
     if pagination_row:
         keyboard.append(pagination_row)
 
-    # Add search and home buttons at the bottom
+    # Always add search and home buttons at the bottom
     keyboard.append([
         InlineKeyboardButton("🔍 ሌላ ለመፈለግ", callback_data="search_again_all"),
         InlineKeyboardButton("🏠 Home", callback_data="go_home")

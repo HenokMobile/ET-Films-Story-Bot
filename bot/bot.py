@@ -578,13 +578,19 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             if pagination_row:
                 keyboard.append(pagination_row)
 
+            # Always add search and home buttons
+            keyboard.append([
+                InlineKeyboardButton("🔍 ሌላ ለመፈለግ", callback_data="search_again_all"),
+                InlineKeyboardButton("🏠 Home", callback_data="go_home")
+            ])
+
             reply_markup = InlineKeyboardMarkup(keyboard)
-            page_info = f"ገጽ {page + 1}/{total_pages}" if total_pages > 1 else ""
+            page_info = f"📄 ገጽ {page + 1}/{total_pages}" if total_pages > 1 else ""
 
             await query.edit_message_text(
-                text=f"🔍 '{search_query}' ለሚል ፍለጋ {len(all_results)} ፊልሞች ተገኝተዋል:\n\n"
+                text=f"🔍 የፈለጉት '{search_query}'\n\n"
                      f"{page_info}\n"
-                     "የሚፈልጉትን ፊልም ይምረጡ:",
+                     "⬇️ የሚፈልጉትን ፊልም ይምረጡ:",
                 reply_markup=reply_markup
             )
             await query.answer()
@@ -724,14 +730,20 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             if pagination_row:
                 keyboard.append(pagination_row)
 
+            # Always add search and home buttons
+            keyboard.append([
+                InlineKeyboardButton("🔍 ሌላ ለመፈለግ", callback_data="search_again_movie"),
+                InlineKeyboardButton("🏠 Home", callback_data="go_home")
+            ])
+
             reply_markup = InlineKeyboardMarkup(keyboard)
-            page_info = f"ገጽ {page + 1}/{total_pages}" if total_pages > 1 else ""
+            page_info = f"📄 ገጽ {page + 1}/{total_pages}" if total_pages > 1 else ""
 
             # Edit the current message
             await query.edit_message_text(
-                text=f"🔍 '{search_query}' ለሚል ፍለጋ {len(all_results)} ነጠላ ፊልሞች ተገኝተዋል:\n\n"
+                text=f"🔍 የፈለጉት '{search_query}'\n\n"
                      f"{page_info}\n"
-                     "የሚፈልጉትን ፊልም ይምረጡ:",
+                     "⬇️ የሚፈልጉትን ፊልም ይምረጡ:",
                 reply_markup=reply_markup
             )
             await query.answer()
@@ -790,14 +802,20 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             if pagination_row:
                 keyboard.append(pagination_row)
 
+            # Always add search and home buttons
+            keyboard.append([
+                InlineKeyboardButton("🔍 ሌላ ለመፈለግ", callback_data="search_again_series"),
+                InlineKeyboardButton("🏠 Home", callback_data="go_home")
+            ])
+
             reply_markup = InlineKeyboardMarkup(keyboard)
-            page_info = f"ገጽ {page + 1}/{total_pages}" if total_pages > 1 else ""
+            page_info = f"📄 ገጽ {page + 1}/{total_pages}" if total_pages > 1 else ""
 
             # Edit the current message
             await query.edit_message_text(
-                text=f"🔍 '{search_query}' ለሚል ፍለጋ {len(all_results)} ተከታታይ ፊልሞች ተገኝተዋል:\n\n"
+                text=f"🔍 የፈለጉት '{search_query}'\n\n"
                      f"{page_info}\n"
-                     "የሚፈልጉትን ተከታታይ ፊልም ይምረጡ:",
+                     "⬇️ የሚፈልጉትን ተከታታይ ፊልም ይምረጡ:",
                 reply_markup=reply_markup
             )
             await query.answer()
