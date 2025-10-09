@@ -35,7 +35,7 @@ class UserBlockSystem:
             except sqlite3.OperationalError:
                 pass  # Column already exists
     
-    async def block_user(self, admin_id: int, user_id: int, reason: str = None):
+    async def block_user(self, admin_id: int, user_id: int, reason: str = None, context=None):
         """Block a user"""
         try:
             with sqlite3.connect(config.USER_DB_PATH) as conn:
@@ -73,6 +73,25 @@ class UserBlockSystem:
                 
                 conn.commit()
                 
+                # Send notification to blocked user
+                if context:
+                    try:
+                        block_message = (
+                            "🚫 **የተገደበ መልእክት**\n\n"
+                            "የBot አገልግሎት ተገድበዋል።\n\n"
+                        )
+                        if reason:
+                            block_message += f"📝 **ምክንያት:** {reason}\n\n"
+                        block_message += "ለበለጠ መረጃ Admin ን ያነጋግሩ።"
+                        
+                        await context.bot.send_message(
+                            chat_id=user_id,
+                            text=block_message,
+                            parse_mode='Markdown'
+                        )
+                    except Exception as e:
+                        logger.error(f"Error sending block notification to user {user_id}: {e}")
+                
                 display_name = f"@{username}" if username else first_name or f"User {user_id}"
                 return True, f"✅ {display_name} ተገድቧል!"
                 
@@ -80,7 +99,7 @@ class UserBlockSystem:
             logger.error(f"Error blocking user: {e}")
             return False, f"❌ Error: {str(e)}"
     
-    async def unblock_user(self, admin_id: int, user_id: int):
+    async def unblock_user(self, admin_id: int, user_id: int, context=None):
         """Unblock a user"""
         try:
             with sqlite3.connect(config.USER_DB_PATH) as conn:
@@ -109,6 +128,21 @@ class UserBlockSystem:
                 ''', (user_id,))
                 
                 conn.commit()
+                
+                # Send notification to unblocked user
+                if context:
+                    try:
+                        await context.bot.send_message(
+                            chat_id=user_id,
+                            text=(
+                                "✅ **ተላቀቁ!**\n\n"
+                                "የBot አገልግሎት እንደገና መጠቀም ይችላሉ።\n\n"
+                                "እንኳን ደህና መለሱ! 🎬"
+                            ),
+                            parse_mode='Markdown'
+                        )
+                    except Exception as e:
+                        logger.error(f"Error sending unblock notification to user {user_id}: {e}")
                 
                 display_name = f"@{username}" if username else first_name or f"User {user_id}"
                 return True, f"✅ {display_name} ተላቀቀ!"

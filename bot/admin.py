@@ -1050,7 +1050,7 @@ class AdminPanel:
                 from user_block import user_block_system
                 user_id = int(state.replace("WAITING_BLOCK_REASON_", ""))
                 
-                success, message = await user_block_system.block_user(user.id, user_id, text)
+                success, message = await user_block_system.block_user(user.id, user_id, text, context)
                 await update.message.reply_text(message)
                 del self.user_states[user.id]
             
@@ -1059,7 +1059,7 @@ class AdminPanel:
                 try:
                     user_id = int(text)
                     
-                    success, message = await user_block_system.unblock_user(user.id, user_id)
+                    success, message = await user_block_system.unblock_user(user.id, user_id, context)
                     await update.message.reply_text(message)
                 except ValueError:
                     await update.message.reply_text("❌ እባክዎ ትክክለኛ User ID ያስገቡ (ቁጥር)")
