@@ -92,19 +92,16 @@ class UserBlockSystem:
                 if context:
                     try:
                         block_message = (
-                            "🚫 *የተገደበ መልእክት*\n\n"
+                            "🚫 የተገደበ መልእክት\n\n"
                             "የBot አገልግሎት ተገድበዋል።\n\n"
                         )
                         if reason:
-                            # Escape special Markdown characters in reason
-                            safe_reason = reason.replace('*', '').replace('_', '').replace('[', '').replace(']', '')
-                            block_message += f"📝 *ምክንያት:* {safe_reason}\n\n"
-                        block_message += "ለበለጠ መረጃ [Admin](https://t.me/Henok_Chat) ን ያነጋግሩ።"
+                            block_message += f"📝 ምክንያት: {reason}\n\n"
+                        block_message += "ለበለጠ መረጃ Admin ን ያነጋግሩ: @Henok_Chat"
                         
                         await context.bot.send_message(
                             chat_id=user_id,
-                            text=block_message,
-                            parse_mode='Markdown'
+                            text=block_message
                         )
                     except Exception as e:
                         logger.error(f"Error sending block notification to user {user_id}: {e}")
@@ -209,7 +206,7 @@ class UserBlockSystem:
             await query.answer("❌ Error fetching data!")
             return
         
-        text = f"🚫 **የተገደቡ ተጠቃሚዎች** (ጠቅላላ: {total})\n\n"
+        text = f"🚫 የተገደቡ ተጠቃሚዎች (ጠቅላላ: {total})\n\n"
         
         if blocked_users:
             for user_id, username, first_name, reason, blocked_date in blocked_users:
@@ -217,7 +214,7 @@ class UserBlockSystem:
                 date_str = blocked_date[:10] if blocked_date else "Unknown"
                 reason_str = reason if reason else "No reason"
                 
-                text += f"👤 {display_name} (ID: `{user_id}`)\n"
+                text += f"👤 {display_name} (ID: {user_id})\n"
                 text += f"   📅 {date_str} | 📝 {reason_str}\n\n"
         else:
             text += "ምንም የተገደቡ ተጠቃሚዎች የሉም።"
@@ -238,7 +235,7 @@ class UserBlockSystem:
         keyboard.append([InlineKeyboardButton("🔙 ወደ User Management", callback_data="admin_user_management")])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+        await query.edit_message_text(text, reply_markup=reply_markup)
     
     async def show_block_interface(self, query, context):
         """Show block/unblock interface"""
@@ -251,11 +248,11 @@ class UserBlockSystem:
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         text = (
-            "🚫 **User Block Management**\n\n"
+            "🚫 User Block Management\n\n"
             "ተጠቃሚዎችን ለማገድ ወይም ለማላቀቅ የሚከተሉትን ይምረጡ:"
         )
         
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
+        await query.edit_message_text(text, reply_markup=reply_markup)
 
 # Global instance
 user_block_system = UserBlockSystem()
