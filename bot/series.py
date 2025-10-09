@@ -77,7 +77,7 @@ class SeriesManager:
                     SELECT file_id, file_name, file_title FROM series 
                     WHERE file_name LIKE ? OR file_title LIKE ?
                     ORDER BY file_name ASC
-                    LIMIT 50
+                    LIMIT 100
                 ''', (f'%{query}%', f'%{query}%'))
                 results = cursor.fetchall()
 
@@ -228,8 +228,7 @@ async def handle_series_search(update: Update, context: ContextTypes.DEFAULT_TYP
     # Send the search results with pagination
     page_info = f"📄 ገጽ {page + 1}/{total_pages}" if total_pages > 1 else ""
     message = await update.message.reply_text(
-        f"📽 *የተከታታይ ፊልም ፍለጋ ውጤት*\n\n"
-        f"🔍 '*{query}*' ለሚል ፍለጋ *{len(all_results)}* ተከታታይ ፊልሞች ተገኝተዋል!\n\n"
+        f"🔍 የፈለጉት '*{query}*'\n\n"
         f"{page_info}\n"
         "⬇️ የሚፈልጉትን ተከታታይ ፊልም ይምረጡ:",
         reply_markup=reply_markup,

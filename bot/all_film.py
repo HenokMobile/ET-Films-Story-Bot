@@ -22,7 +22,7 @@ class AllFilmManager:
                     SELECT file_id, file_name, file_title, 'movie' as type FROM single_movies 
                     WHERE file_name LIKE ? OR file_title LIKE ?
                     ORDER BY file_name ASC
-                    LIMIT 25
+                    LIMIT 50
                 ''', (f'%{query}%', f'%{query}%'))
                 results.extend(cursor.fetchall())
         except Exception as e:
@@ -35,7 +35,7 @@ class AllFilmManager:
                     SELECT file_id, file_name, file_title, 'series' as type FROM series 
                     WHERE file_name LIKE ? OR file_title LIKE ?
                     ORDER BY file_name ASC
-                    LIMIT 25
+                    LIMIT 50
                 ''', (f'%{query}%', f'%{query}%'))
                 results.extend(cursor.fetchall())
         except Exception as e:
@@ -44,7 +44,7 @@ class AllFilmManager:
         # Sort all results alphabetically
         results.sort(key=lambda x: (x[1] or x[2] or "").lower())
         
-        return results[:50]  # Limit to 50 total results
+        return results[:100]  # Limit to 100 total results
 
 async def handle_all_film_search(update: Update, context: ContextTypes.DEFAULT_TYPE, query: str, page: int = 0):
     """Handle search across all films (both single and series)"""
@@ -112,8 +112,7 @@ async def handle_all_film_search(update: Update, context: ContextTypes.DEFAULT_T
     # Send the search results with pagination
     page_info = f"📄 ገጽ {page + 1}/{total_pages}" if total_pages > 1 else ""
     message = await update.message.reply_text(
-        f"🎞 *የሁሉም ፊልም ፍለጋ ውጤት*\n\n"
-        f"🔍 '*{query}*' ለሚል ፍለጋ *{len(all_results)}* ፊልሞች ተገኝተዋል!\n\n"
+        f"🔍 የፈለጉት '*{query}*'\n\n"
         f"{page_info}\n"
         "⬇️ የሚፈልጉትን ፊልም ይምረጡ:",
         reply_markup=reply_markup,

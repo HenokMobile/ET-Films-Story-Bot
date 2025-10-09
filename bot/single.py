@@ -76,7 +76,7 @@ class SingleMovieManager:
                     SELECT file_id, file_name, file_title FROM single_movies 
                     WHERE file_name LIKE ? OR file_title LIKE ?
                     ORDER BY file_name ASC
-                    LIMIT 50
+                    LIMIT 100
                 ''', (f'%{query}%', f'%{query}%'))
                 return cursor.fetchall()
         except Exception as e:
@@ -212,8 +212,7 @@ async def handle_movie_search(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Send the search results with pagination
     page_info = f"📄 ገጽ {page + 1}/{total_pages}" if total_pages > 1 else ""
     message = await update.message.reply_text(
-        f"🎬 *የፊልም ፍለጋ ውጤት*\n\n"
-        f"🔍 '*{query}*' ለሚል ፍለጋ *{len(all_results)}* ነጠላ ፊልሞች ተገኝተዋል!\n\n"
+        f"🔍 የፈለጉት '*{query}*'\n\n"
         f"{page_info}\n"
         "⬇️ የሚፈልጉትን ፊልም ይምረጡ:",
         reply_markup=reply_markup,
