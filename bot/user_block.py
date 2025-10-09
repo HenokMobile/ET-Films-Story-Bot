@@ -151,7 +151,7 @@ class UserBlockSystem:
                             text=(
                                 "✅ *ተላቀቁ!*\n\n"
                                 "የBot አገልግሎት እንደገና መጠቀም ይችላሉ።\n\n"
-                                "እንኳን ደህና መለሱ! 🎬"
+                                "እንኳን ደህና ተመለሱ! 🎬"
                             ),
                             parse_mode='Markdown'
                         )
