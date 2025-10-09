@@ -253,6 +253,27 @@ class AdminPanel:
             await self.show_referral_statistics(query, context)
         elif data == "admin_user_management":
             await self.show_user_management(query, context)
+        elif data == "admin_block_system":
+            from user_block import user_block_system
+            await user_block_system.show_block_interface(query, context)
+        elif data.startswith("block_list_"):
+            from user_block import user_block_system
+            page = int(data.replace("block_list_", ""))
+            await user_block_system.show_blocked_users(query, context, page)
+        elif data == "block_user_prompt":
+            await query.edit_message_text(
+                "🚫 **ተጠቃሚ ለማገድ**\n\n"
+                "እባክዎ የተጠቃሚውን ID ያስገቡ:",
+                parse_mode='Markdown'
+            )
+            self.user_states[query.from_user.id] = "WAITING_BLOCK_USER_ID"
+        elif data == "unblock_user_prompt":
+            await query.edit_message_text(
+                "✅ **ተጠቃሚ ለማላቀቅ**\n\n"
+                "እባክዎ የተጠቃሚውን ID ያስገቡ:",
+                parse_mode='Markdown'
+            )
+            self.user_states[query.from_user.id] = "WAITING_UNBLOCK_USER_ID"
 
 
     async def show_channel_settings(self, query, context):
@@ -1009,6 +1030,41 @@ class AdminPanel:
                     )
 
                 del self.user_states[user.id]
+            
+            elif state == "WAITING_BLOCK_USER_ID":
+                from user_block import user_block_system
+                try:
+                    user_id = int(text)
+                    
+                    # Ask for block reason
+                    self.user_states[user.id] = f"WAITING_BLOCK_REASON_{user_id}"
+                    await update.message.reply_text(
+                        f"🚫 User {user_id} ለማገድ\n\n"
+                        "እባክዎ የማገድ ምክንያት ያስገቡ:"
+                    )
+                except ValueError:
+                    await update.message.reply_text("❌ እባክዎ ትክክለኛ User ID ያስገቡ (ቁጥር)")
+                    del self.user_states[user.id]
+            
+            elif state.startswith("WAITING_BLOCK_REASON_"):
+                from user_block import user_block_system
+                user_id = int(state.replace("WAITING_BLOCK_REASON_", ""))
+                
+                success, message = await user_block_system.block_user(user.id, user_id, text)
+                await update.message.reply_text(message)
+                del self.user_states[user.id]
+            
+            elif state == "WAITING_UNBLOCK_USER_ID":
+                from user_block import user_block_system
+                try:
+                    user_id = int(text)
+                    
+                    success, message = await user_block_system.unblock_user(user.id, user_id)
+                    await update.message.reply_text(message)
+                except ValueError:
+                    await update.message.reply_text("❌ እባክዎ ትክክለኛ User ID ያስገቡ (ቁጥር)")
+                
+                del self.user_states[user.id]
 
 
 
@@ -1060,10 +1116,12 @@ class AdminPanel:
 
     async def show_user_management(self, query, context):
         """Show user management options"""
+        from user_block import user_block_system
+        
         keyboard = [
             [InlineKeyboardButton("🔍 የተጠቃሚ ፍለጋ", callback_data="admin_user_search")],
             [InlineKeyboardButton("📝 የተጠቃሚ ዝርዝር", callback_data="admin_user_list")],
-            [InlineKeyboardButton("🚫 የታገዱ ተጠቃሚዎች", callback_data="admin_blocked_users")],
+            [InlineKeyboardButton("🚫 Block/Unblock ስርዓት", callback_data="admin_block_system")],
             [InlineKeyboardButton("🔙 ወደ Admin Panel", callback_data="back_to_admin")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1071,7 +1129,8 @@ class AdminPanel:
         await query.edit_message_text(
             "👥 **የተጠቃሚዎች አስተዳደር**\n\n"
             "ምን ማድረግ ይፈልጋሉ?",
-            reply_markup=reply_markup
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
         )
 
 # Create global admin instance
