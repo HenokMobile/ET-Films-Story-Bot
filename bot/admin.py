@@ -75,6 +75,59 @@ class AdminPanel:
         query = update.callback_query
         await query.answer()
 
+
+
+    def get_duplicate_stats_from_logs(self):
+        """Extract duplicate statistics from log files"""
+        import re
+        from datetime import datetime, timedelta
+        
+        try:
+            stats = {'today': 0, 'week': 0, 'total': 0}
+            
+            # Read log file (assuming default Python logging to bot.log or similar)
+            # Adjust path as needed
+            log_patterns = [
+                r'🗑️ Deleted duplicate from channel: (.+)',
+                r'🚫 Duplicate BLOCKED from database: (.+)'
+            ]
+            
+            now = datetime.now()
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            week_start = now - timedelta(days=7)
+            
+            # Try to read from logs (you may need to adjust the log file path)
+            try:
+                import os
+                log_files = [f for f in os.listdir('.') if f.endswith('.log')]
+                
+                for log_file in log_files:
+                    with open(log_file, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            for pattern in log_patterns:
+                                if re.search(pattern, line):
+                                    stats['total'] += 1
+                                    
+                                    # Try to parse timestamp (format: 2025-01-09 08:19:38,340)
+                                    timestamp_match = re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                                    if timestamp_match:
+                                        try:
+                                            log_time = datetime.strptime(timestamp_match.group(1), '%Y-%m-%d %H:%M:%S')
+                                            if log_time >= today_start:
+                                                stats['today'] += 1
+                                            if log_time >= week_start:
+                                                stats['week'] += 1
+                                        except:
+                                            pass
+            except Exception as e:
+                logger.debug(f"Could not parse log files for duplicates: {e}")
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Error getting duplicate stats: {e}")
+            return {'today': 0, 'week': 0, 'total': 0}
+
         if query.from_user.id != config.ADMIN_USER_ID:
             await query.edit_message_text("❌ የAdmin መብት የለዎትም!")
             return
@@ -399,6 +452,9 @@ class AdminPanel:
                 """)
                 top_downloads = cursor.fetchall()
 
+            # NEW: Duplicate statistics from logs
+            duplicate_stats = self.get_duplicate_stats_from_logs()
+
         except Exception as e:
             logger.error(f"Error fetching movie statistics: {e}")
             total_movies = today_movies = week_movies = 0
@@ -406,6 +462,7 @@ class AdminPanel:
             total_movie_size = total_series_size = 0
             today_downloads = week_downloads = total_downloads = 0
             top_downloads = []
+            duplicate_stats = {'today': 0, 'week': 0, 'total': 0}
 
         # Calculate sizes in GB/MB
         total_size_bytes = total_movie_size + total_series_size
@@ -441,6 +498,11 @@ class AdminPanel:
             "💾 የStorage መረጃ:\n"
             f"• ጠቅላላ File Size: {total_size_str}\n"
             f"• አማካይ File Size: {avg_size_str}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "🚫 የDuplicate መከላከያ:\n"
+            f"• ዛሬ የታገዱ: {duplicate_stats['today']:,}\n"
+            f"• በሳምንት የታገዱ: {duplicate_stats['week']:,}\n"
+            f"• ጠቅላላ የታገዱ: {duplicate_stats['total']:,}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
             "📈 የDownload ስታቲስቲክስ:\n"
             f"• ዛሬ የተላኩ ፊልሞች: {today_downloads:,}\n"

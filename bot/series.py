@@ -240,47 +240,7 @@ async def handle_series_search(update: Update, context: ContextTypes.DEFAULT_TYP
         context.user_data['last_inline_messages'][user_id] = []
     context.user_data['last_inline_messages'][user_id].append(message.message_id)
 
-async def send_duplicate_notification(bot, file_name, file_size, content_type="Series"):
-    """Send duplicate notification to admin (Part 2 & 3)"""
-    try:
-        size_mb = file_size / (1024 * 1024)
-
-        # Part 2: Channel Delete Notification
-        delete_msg = (
-            "🗑️ *Duplicate Deleted from Channel!*\n\n"
-            f"📁 ስም: `{file_name}`\n"
-            f"📏 መጠን: {size_mb:.2f} GB\n"
-            f"📂 ቻናል: {content_type}\n\n"
-            "⚠️ ምክንያት: በDatabase ውስጥ አስቀድሞ አለ\n"
-            "   (ተመሳሳይ ስም \\+ ተመሳሳይ መጠን)"
-        )
-
-        # Part 3: Database Duplicate Alert
-        db_alert_msg = (
-            "⚠️ *Database Duplicate Detected!*\n\n"
-            f"📁 አዲስ: `{file_name}` ({size_mb:.2f} GB)\n"
-            f"💾 ያለው: `{file_name}` ({size_mb:.2f} GB)\n\n"
-            "❌ በDatabase አልተቀመጠም\n"
-            "✅ ከChannel ተሰርዟል"
-        )
-
-        # Send both notifications
-        await bot.send_message(
-            chat_id=config.ADMIN_USER_ID,
-            text=delete_msg,
-            parse_mode='Markdown'
-        )
-
-        await bot.send_message(
-            chat_id=config.ADMIN_USER_ID,
-            text=db_alert_msg,
-            parse_mode='Markdown'
-        )
-
-        logger.info(f"✅ Duplicate notifications sent to admin for: {file_name}")
-
-    except Exception as e:
-        logger.error(f"❌ Error sending duplicate notification: {e}")
+# Admin notifications removed - duplicates handled silently
 
 async def handle_series_channel_post(message, channel_id):
     """Handle new series posts in monitored channels"""
@@ -336,15 +296,6 @@ async def handle_series_channel_post(message, channel_id):
                         )
 
                         logger.info(f"🗑️ Deleted duplicate from channel: {file_data['file_name']}")
-
-                        # Send admin notifications (Part 2 & 3)
-                        await send_duplicate_notification(
-                            bot, 
-                            file_data['file_name'], 
-                            file_data['file_size'],
-                            "Series"
-                        )
-
                         return False  # Don't save to database
 
                     except Exception as e:
