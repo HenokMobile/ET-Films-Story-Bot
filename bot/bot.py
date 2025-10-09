@@ -159,9 +159,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = update.message.text
 
-    # Update user's last active timestamp
-    db.update_last_active(user.id)
-
     # Delete the usage message if it exists
     if 'usage_message_id' in context.user_data:
         try:
@@ -1197,7 +1194,7 @@ async def handle_bot_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Message text: {update.effective_message.text[:100] if update.effective_message.text else 'N/A'}")
 
 async def send_startup_notifications(application):
-    """Send startup notifications to recent active users and admin"""
+    """Send startup notifications to pending users and admin"""
     try:
         from series import SeriesManager
         from single import SingleMovieManager
@@ -1210,10 +1207,21 @@ async def send_startup_notifications(application):
         series_count = series_mgr.get_series_count()
         movies_count = movie_mgr.get_movies_count()
         
-        # Get users who were active in last 24 hours (excluding admin)
-        recent_users = db.get_recent_active_users(hours=24)
+        # Collect pending user IDs from recent updates
+        pending_users = set()
         
-        # Send notifications to recent active users
+        # Get pending updates
+        try:
+            updates = await application.bot.get_updates(timeout=1)
+            for update in updates:
+                if update.message and update.message.from_user:
+                    pending_users.add(update.message.from_user.id)
+                elif update.callback_query and update.callback_query.from_user:
+                    pending_users.add(update.callback_query.from_user.id)
+        except Exception as e:
+            logger.warning(f"Could not fetch pending updates: {e}")
+        
+        # Send notifications to pending users
         success_count = 0
         failed_count = 0
         
@@ -1227,8 +1235,12 @@ async def send_startup_notifications(application):
             "🎬 እንኳን ደህና መጡ!"
         )
         
-        for user_id, first_name, username in recent_users:
+        for user_id in pending_users:
             try:
+                # Skip admin
+                if user_id == config.ADMIN_USER_ID:
+                    continue
+                    
                 await application.bot.send_message(
                     chat_id=user_id,
                     text=user_notification,
@@ -1252,15 +1264,13 @@ async def send_startup_notifications(application):
             f"✅ Duplicate Detection: ዝግጁ\n\n"
             "━━━━━━━━━━━━━━━━━━━\n\n"
             "📊 *Startup Notifications:*\n"
-            f"• Recent Active Users (24h): {len(recent_users):,}\n"
+            f"• Pending Users: {len(pending_users):,}\n"
             f"• Notifications Sent: {success_count:,} ✅\n"
             f"• Failed: {failed_count:,} ❌\n\n"
-            "💡 *System Behavior:*\n"
-            "   • Bot ዝግ እያለ የተላኩ መልእክቶች → ይሰረዛሉ\n"
-            "   • ቀድሞ active የነበሩ users → Notification ይቀበላሉ\n"
-            "   • ለዝግ እያለ የተላኩ መልእክቶች → ምንም response የለም\n\n"
-            "🚫 *Duplicate Prevention:*\n"
-            "   • File\\_name + File\\_size 100% ተመሳሳይ → ይሰረዛል"
+            "💡 *Duplicate Prevention System:*\n"
+            "   • File\\_name + File\\_size 100% ተመሳሳይ ከሆነ:\n"
+            "      → ከChannel ይሰረዛል\n"
+            "      → ለእርስዎ ሪፖርት ይደረጋል"
         )
         
         await application.bot.send_message(
@@ -1271,7 +1281,7 @@ async def send_startup_notifications(application):
         
         logger.info(
             f"✅ Startup notifications complete: "
-            f"{success_count} sent, {failed_count} failed to {len(recent_users)} recent active users"
+            f"{success_count} sent, {failed_count} failed to {len(pending_users)} users"
         )
         
     except Exception as e:
