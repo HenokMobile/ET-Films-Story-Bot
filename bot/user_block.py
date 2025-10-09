@@ -99,7 +99,7 @@ class UserBlockSystem:
                             # Escape special Markdown characters in reason
                             safe_reason = reason.replace('*', '').replace('_', '').replace('[', '').replace(']', '')
                             block_message += f"📝 *ምክንያት:* {safe_reason}\n\n"
-                        block_message += "ለበለጠ መረጃ Admin ን ያነጋግሩ።"
+                        block_message += "ለበለጠ መረጃ [Admin](https://t.me/Henok_Chat) ን ያነጋግሩ።"
                         
                         await context.bot.send_message(
                             chat_id=user_id,
