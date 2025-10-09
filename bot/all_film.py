@@ -70,9 +70,9 @@ async def handle_all_film_search(update: Update, context: ContextTypes.DEFAULT_T
         )
         return
 
-    # Pagination settings - 10 items per page, max 5 pages (50 items total)
-    per_page = 10
-    max_items = 50  # 5 pages × 10 items
+    # Pagination settings - 5 items per page, max 10 pages (50 items total)
+    per_page = 5
+    max_items = 50  # 10 pages × 5 items
     limited_results = all_results[:max_items]
     total_pages = (len(limited_results) + per_page - 1) // per_page
 
@@ -81,7 +81,7 @@ async def handle_all_film_search(update: Update, context: ContextTypes.DEFAULT_T
     end_idx = start_idx + per_page
     current_page_results = limited_results[start_idx:end_idx]
 
-    # Create inline keyboard with film options (10 per page)
+    # Create inline keyboard with film options (5 per page)
     keyboard = []
     for i, (file_id, file_name, file_title, film_type) in enumerate(current_page_results):
         display_name = file_name if file_name else (file_title if file_title else f"ፋይል {start_idx + i + 1}")

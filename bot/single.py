@@ -171,9 +171,9 @@ async def handle_movie_search(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Don't return - keep state active so user can search again
         return
 
-    # Pagination settings - 10 items per page, max 5 pages (50 items total)
-    per_page = 10
-    max_items = 50  # 5 pages × 10 items
+    # Pagination settings - 5 items per page, max 10 pages (50 items total)
+    per_page = 5
+    max_items = 50  # 10 pages × 5 items
     limited_results = all_results[:max_items]
     total_pages = (len(limited_results) + per_page - 1) // per_page
 
@@ -182,7 +182,7 @@ async def handle_movie_search(update: Update, context: ContextTypes.DEFAULT_TYPE
     end_idx = start_idx + per_page
     current_page_results = limited_results[start_idx:end_idx]
 
-    # Create inline keyboard with movie options (10 per page)
+    # Create inline keyboard with movie options (5 per page)
     keyboard = []
     for i, (file_id, file_name, file_title) in enumerate(current_page_results):
         # Prioritize file_name over file_title for display
