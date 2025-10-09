@@ -128,6 +128,11 @@ class AdminPanel:
             logger.error(f"Error getting duplicate stats: {e}")
             return {'today': 0, 'week': 0, 'total': 0}
 
+    async def handle_admin_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle admin panel callbacks"""
+        query = update.callback_query
+        await query.answer()
+
         if query.from_user.id != config.ADMIN_USER_ID:
             await query.edit_message_text("❌ የAdmin መብት የለዎትም!")
             return
