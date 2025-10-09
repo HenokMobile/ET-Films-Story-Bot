@@ -154,7 +154,8 @@ class UserBlockSystem:
                             text=(
                                 "✅ *ተላቀቁ!*\n\n"
                                 "የBot አገልግሎት እንደገና መጠቀም ይችላሉ።\n\n"
-                                "እንኳን ደህና መለሱ! 🎬"
+                                "እንኳን ደህና መለሱ! 🎬\n\n"
+                                "ለማንኛውም ጥያቄ [Admin](https://t.me/Henok_Chat) ያነጋግሩ።"
                             ),
                             parse_mode='Markdown'
                         )

@@ -310,7 +310,7 @@ class PaymentSystem:
         if 'card_info' in session:
             confirm_text += f"\n💳 ስልክ ቁጥር: {session['card_info']}"
 
-        confirm_text += f"\n💰የገንዘብ መጠን: {session['amount']} ብር ነው\n📸 Screenshot: ✅ ተልክዋል\n\nለማረጋገጥ 'አረጋግጥ' የምለውን ይጫኑ"
+        confirm_text += f"\n💰የገንዘብ መጠን: {session['amount']} ብር ነው\n📸 Screenshot: ✅ ተልክዋል\n\nለማረጋገጥ 'አረጋግጥ' የምለውን ይጫኑ\n\nለእገዛ [Admin](https://t.me/Henok_Chat) ያነጋግሩ።"
 
         await update.message.reply_text(
             confirm_text,
