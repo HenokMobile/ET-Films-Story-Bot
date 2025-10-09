@@ -49,7 +49,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🚫 **የተገደበ ተጠቃሚ**\n\n"
             "እርስዎ ከBot አገልግሎት ተገደብተዋል።\n"
-            "ለበለጠ መረጃ Admin ን ያነጋግሩ።",
+            "ለበለጠ መረጃ [Admin](https://t.me/Henok_Chat) ን ያነጋግሩ።",
             parse_mode='Markdown'
         )
         return
@@ -111,7 +111,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 "🚫 **የተገደበ ተጠቃሚ**\n\n"
                 "እርስዎ ከBot አገልግሎት ተገደብተዋል።\n"
-                "ለበለጠ መረጃ Admin ን ያነጋግሩ።",
+                "ለበለጠ መረጃ [Admin](https://t.me/Henok_Chat) ን ያነጋግሩ።",
                 parse_mode='Markdown'
             )
             return
@@ -184,7 +184,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check if user is blocked
     if user_block_system.is_user_blocked(user.id):
         await update.message.reply_text(
-            "🚫 እርስዎ ተገድበዋል።",
+            "🚫 **የተገደበ ተጠቃሚ**\n\n"
+            "እርስዎ ከBot አገልግሎት ተገደብተዋል።\n"
+            "ለበለጠ መረጃ [Admin](https://t.me/Henok_Chat) ን ያነጋግሩ።",
             parse_mode='Markdown'
         )
         return
@@ -448,7 +450,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🚫 **የተገደበ ተጠቃሚ**\n\n"
             "እርስዎ ከBot አገልግሎት ተገደብተዋል።\n"
-            "ለበለጠ መረጃ Admin ን ያነጋግሩ።",
+            "ለበለጠ መረጃ [Admin](https://t.me/Henok_Chat) ን ያነጋግሩ።",
             parse_mode='Markdown'
         )
         return
@@ -465,9 +467,10 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
     """Handle admin panel callbacks"""
     query = update.callback_query
     data = query.data
+    user_id = query.from_user.id
 
     # Check if user is blocked
-    if user_block_system.is_user_blocked(query.from_user.id):
+    if user_block_system.is_user_blocked(user_id):
         await query.answer("🚫 እርስዎ ተገድበዋል።", show_alert=True)
         return
 
@@ -543,8 +546,6 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             parts = data.split("_")
             film_type = parts[1]  # "movie" or "series"
             index = int(parts[2])
-
-            user_id = query.from_user.id
 
             # Check if user is blocked
             if user_block_system.is_user_blocked(user_id):
@@ -954,7 +955,7 @@ async def balance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🚫 **የተገደበ ተጠቃሚ**\n\n"
             "እርስዎ ከBot አገልግሎት ተገደብተዋል።\n"
-            "ለበለጠ መረጃ Admin ን ያነጋግሩ።",
+            "ለበለጠ መረጃ [Admin](https://t.me/Henok_Chat) ን ያነጋግሩ።",
             parse_mode='Markdown'
         )
         return
@@ -1003,7 +1004,7 @@ async def payment_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🚫 **የተገደበ ተጠቃሚ**\n\n"
             "እርስዎ ከBot አገልግሎት ተገደብተዋል።\n"
-            "ለበለጠ መረጃ Admin ን ያነጋግሩ።",
+            "ለበለጠ መረጃ [Admin](https://t.me/Henok_Chat) ን ያነጋግሩ።",
             parse_mode='Markdown'
         )
         return
@@ -1025,7 +1026,7 @@ async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🚫 **የተገደበ ተጠቃሚ**\n\n"
             "እርስዎ ከBot አገልግሎት ተገደብተዋል።\n"
-            "ለበለጠ መረጃ Admin ን ያነጋግሩ።",
+            "ለበለጠ መረጃ [Admin](https://t.me/Henok_Chat) ን ያነጋግሩ።",
             parse_mode='Markdown'
         )
         return
@@ -1061,7 +1062,7 @@ async def series_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🚫 **የተገደበ ተጠቃሚ**\n\n"
             "እርስዎ ከBot አገልግሎት ተገደብተዋል።\n"
-            "ለበለጠ መረጃ Admin ን ያነጋግሩ።",
+            "ለበለጠ መረጃ [Admin](https://t.me/Henok_Chat) ን ያነጋግሩ።",
             parse_mode='Markdown'
         )
         return
@@ -1087,7 +1088,7 @@ async def single_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🚫 **የተገደበ ተጠቃሚ**\n\n"
             "እርስዎ ከBot አገልግሎት ተገደብተዋል።\n"
-            "ለበለጠ መረጃ Admin ን ያነጋግሩ።",
+            "ለበለጠ መረጃ [Admin](https://t.me/Henok_Chat) ን ያነጋግሩ።",
             parse_mode='Markdown'
         )
         return
@@ -1113,7 +1114,7 @@ async def all_films_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "🚫 **የተገደበ ተጠቃሚ**\n\n"
             "እርስዎ ከBot አገልግሎት ተገደብተዋል።\n"
-            "ለበለጠ መረጃ Admin ን ያነጋግሩ።",
+            "ለበለጠ መረጃ [Admin](https://t.me/Henok_Chat) ን ያነጋግሩ።",
             parse_mode='Markdown'
         )
         return
