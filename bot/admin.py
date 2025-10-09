@@ -253,6 +253,11 @@ class AdminPanel:
             await self.show_referral_statistics(query, context)
         elif data == "admin_user_management":
             await self.show_user_management(query, context)
+        elif data == "admin_user_list":
+            await self.show_user_list(query, context, page=0)
+        elif data.startswith("user_list_"):
+            page = int(data.replace("user_list_", ""))
+            await self.show_user_list(query, context, page)
         elif data == "admin_block_system":
             from user_block import user_block_system
             await user_block_system.show_block_interface(query, context)
@@ -1132,6 +1137,79 @@ class AdminPanel:
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
+    
+    async def show_user_list(self, query, context, page=0):
+        """Show paginated list of all users"""
+        try:
+            with sqlite3.connect(config.USER_DB_PATH) as conn:
+                # Count total users
+                cursor = conn.execute('SELECT COUNT(*) FROM users')
+                total = cursor.fetchone()[0]
+                
+                # Get paginated users
+                limit = 10
+                offset = page * limit
+                
+                cursor = conn.execute('''
+                    SELECT user_id, username, first_name, balance, joined_date, is_blocked
+                    FROM users
+                    ORDER BY joined_date DESC
+                    LIMIT ? OFFSET ?
+                ''', (limit, offset))
+                
+                users = cursor.fetchall()
+        except Exception as e:
+            logger.error(f"Error fetching user list: {e}")
+            await query.answer("❌ Error fetching data!")
+            return
+        
+        text = f"📋 የተጠቃሚዎች ዝርዝር (ጠቅላላ: {total})\n\n"
+        
+        if users:
+            for user_id, username, first_name, balance, joined_date, is_blocked in users:
+                # Display name
+                if username:
+                    display_name = f"@{username}"
+                elif first_name:
+                    display_name = first_name
+                else:
+                    display_name = f"User {user_id}"
+                
+                # Status icon
+                status = "🚫" if is_blocked else "✅"
+                
+                # Date
+                date_str = joined_date[:10] if joined_date else "Unknown"
+                
+                text += f"{status} {display_name}\n"
+                text += f"   💰 {balance} ብር | 📅 {date_str}\n"
+                text += f"   ID: {user_id}\n\n"
+        else:
+            text += "ምንም ተጠቃሚዎች የሉም።"
+        
+        # Pagination
+        keyboard = []
+        nav_buttons = []
+        
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("◀️ ቀዳሚ", callback_data=f"user_list_{page-1}"))
+        
+        total_pages = (total + limit - 1) // limit
+        if page < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton("ቀጣይ ▶️", callback_data=f"user_list_{page+1}"))
+        
+        if nav_buttons:
+            keyboard.append(nav_buttons)
+        
+        keyboard.append([InlineKeyboardButton("🔙 ወደ User Management", callback_data="admin_user_management")])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        page_info = f"ገጽ {page + 1}/{total_pages}" if total_pages > 1 else ""
+        if page_info:
+            text += f"\n{page_info}"
+        
+        await query.edit_message_text(text, reply_markup=reply_markup)
 
 # Create global admin instance
 admin_panel = AdminPanel()
