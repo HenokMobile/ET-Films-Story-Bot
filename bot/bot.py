@@ -1018,50 +1018,61 @@ async def all_films_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     USER_STATES[user.id] = WAITING_FOR_ALL_SEARCH
 
-# Global variables for batch processing
-BATCH_QUEUE = []
-BATCH_TIMER = None
-BATCH_DELAY = 2  # seconds
+# Global asyncio Queue for channel posts - continuous processing
+CHANNEL_QUEUE = None  # Will be initialized in main()
 
-async def process_batch():
-    """Process all messages in batch queue"""
-    global BATCH_QUEUE, BATCH_TIMER
-
-    if not BATCH_QUEUE:
-        BATCH_TIMER = None
-        return
-
-    logger.info(f"Processing batch of {len(BATCH_QUEUE)} messages...")
+async def channel_consumer():
+    """Simple async queue feeder - no blocking calls for maximum throughput"""
+    import time
+    
     processed_count = 0
-
-    for message_data in BATCH_QUEUE:
+    error_count = 0
+    start_time = time.time()
+    
+    logger.info("🚀 Channel Consumer started - async queue feeder mode!")
+    
+    while True:
         try:
+            # Get message from queue (blocks until available)
+            message_data = await CHANNEL_QUEUE.get()
+            
             message = message_data['message']
             channel_id = message_data['channel_id']
-
-            # Determine which database to save to based on channel
-            if channel_id in config.SINGLE_MOVIE_CHANNEL_IDS:
-                success = await handle_movie_channel_post(message, channel_id)
-                if success:
-                    processed_count += 1
-
-            elif channel_id in config.SERIES_CHANNEL_IDS:
-                success = await handle_series_channel_post(message, channel_id)
-                if success:
-                    processed_count += 1
-
+            
+            # Simple async processing - no blocking duplicate checks
+            file_obj = message.document or message.video
+            if file_obj:
+                try:
+                    if channel_id in config.SINGLE_MOVIE_CHANNEL_IDS:
+                        success = await handle_movie_channel_post(message, channel_id)
+                        if success:
+                            processed_count += 1
+                    
+                    elif channel_id in config.SERIES_CHANNEL_IDS:
+                        success = await handle_series_channel_post(message, channel_id)
+                        if success:
+                            processed_count += 1
+                except Exception as e:
+                    logger.error(f"❌ Error processing message: {e}")
+                    error_count += 1
+                
+                # Log stats every 50 files
+                if (processed_count + error_count) > 0 and (processed_count + error_count) % 50 == 0:
+                    elapsed = time.time() - start_time
+                    rate = (processed_count + error_count) / elapsed if elapsed > 0 else 0
+                    logger.info(
+                        f"📊 Stats: {processed_count} processed, "
+                        f"{error_count} errors | Queue: {CHANNEL_QUEUE.qsize()} | Rate: {rate:.1f} files/sec"
+                    )
+            
+            CHANNEL_QUEUE.task_done()
+                
         except Exception as e:
-            logger.error(f"Error processing batch message: {e}")
-
-    # Clear the queue
-    BATCH_QUEUE = []
-    BATCH_TIMER = None
-    logger.info(f"Batch processing completed! {processed_count}/{len(BATCH_QUEUE)} messages processed successfully.")
+            logger.error(f"❌ Channel consumer error: {e}")
+            await asyncio.sleep(0.1)
 
 async def handle_channel_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle new posts in monitored channels with batch processing"""
-    global BATCH_QUEUE, BATCH_TIMER
-
+    """Handle new posts in monitored channels with backpressure protection"""
     if not update.channel_post:
         return
 
@@ -1070,33 +1081,63 @@ async def handle_channel_post(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # Check if message has document/video
     if message.document or message.video:
-        # Add to batch queue
-        BATCH_QUEUE.append({
-            'message': message,
-            'channel_id': channel_id
-        })
-
-        logger.info(f"Added message to batch queue. Queue size: {len(BATCH_QUEUE)}")
-
-        # Cancel existing timer if any
-        if BATCH_TIMER:
-            BATCH_TIMER.cancel()
-
-        # Set new timer for batch processing
-        import asyncio
-
-        async def delayed_process():
-            await asyncio.sleep(BATCH_DELAY)
-            await process_batch()
-
-        BATCH_TIMER = asyncio.create_task(delayed_process())
+        try:
+            # Instant enqueue with timeout for backpressure
+            await asyncio.wait_for(
+                CHANNEL_QUEUE.put({
+                    'message': message,
+                    'channel_id': channel_id
+                }),
+                timeout=5.0  # Wait max 5 seconds if queue is full
+            )
+            
+            queue_size = CHANNEL_QUEUE.qsize()
+            logger.info(f"✅ Enqueued. Queue: {queue_size}")
+            
+            # Progressive warnings and admin notification
+            if queue_size > 8000:
+                logger.critical(f"🚨 CRITICAL: Queue at {queue_size}/10000 - near capacity!")
+                # Notify admin
+                try:
+                    await context.bot.send_message(
+                        chat_id=config.ADMIN_USER_ID,
+                        text=f"🚨 ALERT: Channel queue critical!\n\n"
+                             f"Queue size: {queue_size}/10,000\n"
+                             f"System may start rejecting files soon!"
+                    )
+                except:
+                    pass
+            elif queue_size > 5000:
+                logger.warning(f"⚠️ WARNING: Queue at {queue_size}/10000")
+                
+        except asyncio.TimeoutError:
+            logger.error(f"🚨 Queue FULL (timeout)! Message REJECTED after 5s wait")
+            # Notify admin of data loss
+            try:
+                file_name = getattr(message.document or message.video, 'file_name', 'Unknown')
+                await context.bot.send_message(
+                    chat_id=config.ADMIN_USER_ID,
+                    text=f"❌ FILE LOST - Queue Full!\n\n"
+                         f"File: {file_name}\n"
+                         f"Queue overloaded - please slow down uploads!"
+                )
+            except:
+                pass
+        except asyncio.QueueFull:
+            logger.error(f"🚨 Queue FULL! Message REJECTED")
 
 async def main():
     """Start the bot"""
     import asyncio
     import signal
     
+    global CHANNEL_QUEUE
+    
     print("🤖 Telegram bot እየጀመር ነው...")
+    
+    # Initialize channel queue with bounded size
+    CHANNEL_QUEUE = asyncio.Queue(maxsize=10000)
+    logger.info("📋 Channel Queue initialized (max: 10,000)")
     
     # Initialize background worker
     from background_worker import background_worker
@@ -1105,6 +1146,10 @@ async def main():
     # Start background worker in separate task
     asyncio.create_task(background_worker.start())
     logger.info("🔄 Background Worker started in parallel")
+    
+    # Start channel consumer in separate task - NEW!
+    asyncio.create_task(channel_consumer())
+    logger.info("🚀 Channel Consumer started - instant processing!")
     
     # Create application with conflict resolution
     application = Application.builder().token(config.BOT_TOKEN).build()

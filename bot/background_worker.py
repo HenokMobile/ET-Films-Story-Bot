@@ -52,9 +52,22 @@ class BackgroundWorker:
         return True
     
     async def start(self):
-        """Start background processing - serial to prevent race conditions"""
+        """Start background processing with concurrent workers for 10x speed"""
         self.running = True
-        logger.info("🚀 Background Worker started with optimized serial processing")
+        num_workers = 10  # Process 10 files simultaneously
+        logger.info(f"🚀 Background Worker started with {num_workers} parallel workers!")
+        
+        # Create worker pool
+        workers = []
+        for i in range(num_workers):
+            workers.append(asyncio.create_task(self._worker(i)))
+        
+        # Wait for all workers
+        await asyncio.gather(*workers, return_exceptions=True)
+    
+    async def _worker(self, worker_id):
+        """Individual worker to process files concurrently"""
+        logger.info(f"👷 Worker #{worker_id} started")
         
         while self.running:
             try:
@@ -62,11 +75,14 @@ class BackgroundWorker:
                     file_data = self.queue.popleft()
                     await self.process_file(file_data)
                 else:
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.01)  # Very brief pause when queue empty
+            except IndexError:
+                # Queue was empty, another worker got the item
+                await asyncio.sleep(0.01)
             except Exception as e:
-                logger.error(f"❌ Background worker error: {e}")
+                logger.error(f"❌ Worker #{worker_id} error: {e}")
                 self.stats['errors'] += 1
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.1)
     
     async def process_file(self, file_data):
         """Process file with atomic duplicate detection and database save"""
@@ -133,6 +149,18 @@ class BackgroundWorker:
             'errors': self.stats['errors'],
             'queue_rejections': self.stats['queue_rejections']
         }
+    
+    def log_stats(self):
+        """Log comprehensive statistics"""
+        stats = self.get_stats()
+        logger.info(
+            f"📊 Background Worker Stats:\n"
+            f"   Queue: {stats['queue_size']}\n"
+            f"   Processed: {stats['processed']}\n"
+            f"   Duplicates: {stats['duplicates_blocked']}\n"
+            f"   Errors: {stats['errors']}\n"
+            f"   Rejections: {stats['queue_rejections']}"
+        )
     
     async def stop(self):
         """Stop background worker"""
