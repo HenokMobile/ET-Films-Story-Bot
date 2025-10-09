@@ -92,11 +92,13 @@ class UserBlockSystem:
                 if context:
                     try:
                         block_message = (
-                            "🚫 **የተገደበ መልእክት**\n\n"
+                            "🚫 *የተገደበ መልእክት*\n\n"
                             "የBot አገልግሎት ተገድበዋል።\n\n"
                         )
                         if reason:
-                            block_message += f"📝 **ምክንያት:** {reason}\n\n"
+                            # Escape special Markdown characters in reason
+                            safe_reason = reason.replace('*', '').replace('_', '').replace('[', '').replace(']', '')
+                            block_message += f"📝 *ምክንያት:* {safe_reason}\n\n"
                         block_message += "ለበለጠ መረጃ Admin ን ያነጋግሩ።"
                         
                         await context.bot.send_message(
@@ -150,7 +152,7 @@ class UserBlockSystem:
                         await context.bot.send_message(
                             chat_id=user_id,
                             text=(
-                                "✅ **ተላቀቁ!**\n\n"
+                                "✅ *ተላቀቁ!*\n\n"
                                 "የBot አገልግሎት እንደገና መጠቀም ይችላሉ።\n\n"
                                 "እንኳን ደህና መለሱ! 🎬"
                             ),
