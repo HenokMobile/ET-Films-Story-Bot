@@ -50,21 +50,36 @@ class UserBlockSystem:
                 
                 username, first_name = user_info
                 
-                # Check if already blocked
+                # Check if user exists in blocked_users table
                 cursor = conn.execute('''
-                    SELECT id FROM blocked_users 
-                    WHERE user_id = ? AND status = 'blocked'
+                    SELECT id, status FROM blocked_users 
+                    WHERE user_id = ?
                 ''', (user_id,))
                 
-                if cursor.fetchone():
-                    return False, "⚠️ ተጠቃሚ በቀደሙ ተገድቧል!"
+                existing = cursor.fetchone()
                 
-                # Block user
-                conn.execute('''
-                    INSERT INTO blocked_users 
-                    (user_id, username, first_name, blocked_by, block_reason)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (user_id, username, first_name, admin_id, reason))
+                if existing:
+                    if existing[1] == 'blocked':
+                        return False, "⚠️ ተጠቃሚ በቀደሙ ተገድቧል!"
+                    
+                    # User was previously blocked and unblocked - update existing record
+                    conn.execute('''
+                        UPDATE blocked_users 
+                        SET status = 'blocked', 
+                            blocked_by = ?,
+                            block_reason = ?,
+                            blocked_date = CURRENT_TIMESTAMP,
+                            username = ?,
+                            first_name = ?
+                        WHERE user_id = ?
+                    ''', (admin_id, reason, username, first_name, user_id))
+                else:
+                    # New block - insert new record
+                    conn.execute('''
+                        INSERT INTO blocked_users 
+                        (user_id, username, first_name, blocked_by, block_reason)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (user_id, username, first_name, admin_id, reason))
                 
                 # Update users table
                 conn.execute('''
