@@ -229,9 +229,7 @@ async def handle_movie_search(update: Update, context: ContextTypes.DEFAULT_TYPE
 # Admin notifications removed - duplicates handled silently
 
 async def handle_movie_channel_post(message, channel_id):
-    """Handle new movie posts in monitored channels"""
-    movie_manager = SingleMovieManager()
-
+    """Handle new movie posts with quick pre-check and queue system"""
     if message.document or message.video:
         file_obj = message.document or message.video
 
@@ -242,66 +240,44 @@ async def handle_movie_channel_post(message, channel_id):
             'file_name': getattr(file_obj, 'file_name', '') or '',
             'file_title': message.caption or '',
             'channel_id': channel_id,
-            'file_size': getattr(file_obj, 'file_size', 0) or 0
+            'file_size': getattr(file_obj, 'file_size', 0) or 0,
+            'film_type': 'single'
         }
 
-        # Check if duplicate exists (100% match: name + size, or wildcard for legacy size=0)
+        # ⚡ QUICK PRE-CHECK (< 0.1s) - 100% exact match by name only
         if file_data['file_size'] > 0:
             import sqlite3
             with sqlite3.connect(config.SINGLE_DB_PATH) as conn:
                 cursor = conn.cursor()
-
-                # Check for exact match (name + size) OR legacy match (name + size=0)
+                
+                # Quick name-only check for instant blocking
                 cursor.execute('''
                     SELECT id, file_size FROM single_movies 
-                    WHERE file_name = ? AND (file_size = ? OR file_size = 0)
-                ''', (file_data['file_name'], file_data['file_size']))
-
+                    WHERE file_name = ? LIMIT 1
+                ''', (file_data['file_name'],))
+                
                 existing = cursor.fetchone()
-
-                if existing:
-                    # If existing entry has size=0, update it with new size
-                    if existing[1] == 0:
-                        logger.info(f"📝 Updating legacy file size: {file_data['file_name']}")
-                        conn.execute('''
-                            UPDATE single_movies 
-                            SET file_size = ? 
-                            WHERE id = ?
-                        ''', (file_data['file_size'], existing[0]))
-                        conn.commit()
-                        logger.info(f"✅ Updated file size to {file_data['file_size']} bytes")
-
-                    # Delete from channel (duplicate regardless of size match)
+                
+                if existing and existing[1] == file_data['file_size']:
+                    # 100% exact match - INSTANT DELETE
                     try:
                         from telegram import Bot
                         bot = Bot(token=config.BOT_TOKEN)
-
                         await bot.delete_message(
                             chat_id=channel_id,
                             message_id=message.message_id
                         )
-
-                        logger.info(f"🗑️ Deleted duplicate from channel: {file_data['file_name']}")
-                        return False  # Don't save to database
-
+                        logger.info(f"⚡ INSTANT BLOCK: {file_data['file_name']}")
+                        return False
                     except Exception as e:
-                        logger.error(f"❌ Error deleting duplicate from channel: {e}")
+                        logger.error(f"❌ Error deleting instant duplicate: {e}")
 
-        # If no duplicate found or file_size is 0, try to save to database
-        # The save_to_database function now handles the duplicate check BEFORE insertion
-        new_id, is_duplicate = await movie_manager.save_to_database(**file_data)
+        # 📋 ADD TO BACKGROUND QUEUE for deep processing
+        from background_worker import background_worker
+        background_worker.add_to_queue(file_data)
         
-        if not is_duplicate and new_id:
-            logger.info(f"Added new movie: {file_data['file_name']} ({file_data['file_size']} bytes)")
-            return True
-        elif is_duplicate:
-            # This case should ideally not be reached if channel deletion is handled above,
-            # but it's a safeguard.
-            logger.warning(f"Duplicate movie detected but not blocked earlier: {file_data['file_name']}")
-            return False
-        else:
-            logger.error(f"Failed to save movie: {file_data['file_name']}")
-            return False
+        logger.info(f"✅ Queued for processing: {file_data['file_name']}")
+        return True
 
     return False
 

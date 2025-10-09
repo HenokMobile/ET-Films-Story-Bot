@@ -459,6 +459,10 @@ class AdminPanel:
 
             # NEW: Duplicate statistics from logs
             duplicate_stats = self.get_duplicate_stats_from_logs()
+            
+            # Background Worker stats
+            from background_worker import background_worker
+            worker_stats = background_worker.get_stats()
 
         except Exception as e:
             logger.error(f"Error fetching movie statistics: {e}")
@@ -468,6 +472,7 @@ class AdminPanel:
             today_downloads = week_downloads = total_downloads = 0
             top_downloads = []
             duplicate_stats = {'today': 0, 'week': 0, 'total': 0}
+            worker_stats = {'queue_size': 0, 'processed': 0, 'duplicates_blocked': 0, 'errors': 0}
 
         # Calculate sizes in GB/MB
         total_size_bytes = total_movie_size + total_series_size
@@ -503,6 +508,12 @@ class AdminPanel:
             "💾 የStorage መረጃ:\n"
             f"• ጠቅላላ File Size: {total_size_str}\n"
             f"• አማካይ File Size: {avg_size_str}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "🔄 Background Worker:\n"
+            f"• Queue Size: {worker_stats['queue_size']:,}\n"
+            f"• Processed: {worker_stats['processed']:,}\n"
+            f"• Duplicates Blocked: {worker_stats['duplicates_blocked']:,}\n"
+            f"• Errors: {worker_stats['errors']:,}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
             "🚫 የDuplicate መከላከያ:\n"
             f"• ዛሬ የታገዱ: {duplicate_stats['today']:,}\n"

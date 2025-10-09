@@ -243,9 +243,7 @@ async def handle_series_search(update: Update, context: ContextTypes.DEFAULT_TYP
 # Admin notifications removed - duplicates handled silently
 
 async def handle_series_channel_post(message, channel_id):
-    """Handle new series posts in monitored channels"""
-    series_manager = SeriesManager()
-
+    """Handle new series posts with quick pre-check and queue system"""
     if message.document or message.video:
         file_obj = message.document or message.video
 
@@ -256,66 +254,44 @@ async def handle_series_channel_post(message, channel_id):
             'file_name': getattr(file_obj, 'file_name', '') or '',
             'file_title': message.caption or '',
             'channel_id': channel_id,
-            'file_size': getattr(file_obj, 'file_size', 0) or 0
+            'file_size': getattr(file_obj, 'file_size', 0) or 0,
+            'film_type': 'series'
         }
 
-        # Check if duplicate exists (100% match: name + size, or wildcard for legacy size=0)
+        # ⚡ QUICK PRE-CHECK (< 0.1s) - 100% exact match by name only
         if file_data['file_size'] > 0:
             import sqlite3
             with sqlite3.connect(config.SERIES_DB_PATH) as conn:
                 cursor = conn.cursor()
-
-                # Check for exact match (name + size) OR legacy match (name + size=0)
+                
+                # Quick name-only check for instant blocking
                 cursor.execute('''
                     SELECT id, file_size FROM series 
-                    WHERE file_name = ? AND (file_size = ? OR file_size = 0)
-                ''', (file_data['file_name'], file_data['file_size']))
-
+                    WHERE file_name = ? LIMIT 1
+                ''', (file_data['file_name'],))
+                
                 existing = cursor.fetchone()
-
-                if existing:
-                    # If existing entry has size=0, update it with new size
-                    if existing[1] == 0:
-                        logger.info(f"📝 Updating legacy file size: {file_data['file_name']}")
-                        conn.execute('''
-                            UPDATE series 
-                            SET file_size = ? 
-                            WHERE id = ?
-                        ''', (file_data['file_size'], existing[0]))
-                        conn.commit()
-                        logger.info(f"✅ Updated file size to {file_data['file_size']} bytes")
-
-                    # Delete from channel (duplicate regardless of size match)
+                
+                if existing and existing[1] == file_data['file_size']:
+                    # 100% exact match - INSTANT DELETE
                     try:
                         from telegram import Bot
                         bot = Bot(token=config.BOT_TOKEN)
-
                         await bot.delete_message(
                             chat_id=channel_id,
                             message_id=message.message_id
                         )
-
-                        logger.info(f"🗑️ Deleted duplicate from channel: {file_data['file_name']}")
-                        return False  # Don't save to database
-
+                        logger.info(f"⚡ INSTANT BLOCK: {file_data['file_name']}")
+                        return False
                     except Exception as e:
-                        logger.error(f"❌ Error deleting duplicate from channel: {e}")
+                        logger.error(f"❌ Error deleting instant duplicate: {e}")
 
-        # Use the modified save_to_database method
-        # It returns (id, is_duplicate)
-        new_id, is_duplicate = await series_manager.save_to_database(**file_data)
-
-        if is_duplicate:
-            # If it's a duplicate, it means save_to_database handled the blocking and notifications
-            # We just need to ensure it's not added again and return False
-            return False
-        elif new_id is not None:
-            logger.info(f"Added new series: {file_data['file_name']} ({file_data['file_size']} bytes)")
-            return True # Successfully saved to DB
-        else:
-            # Handle cases where save_to_database failed for reasons other than duplication
-            logger.error(f"Failed to save series to DB: {file_data['file_name']}")
-            return False
+        # 📋 ADD TO BACKGROUND QUEUE for deep processing
+        from background_worker import background_worker
+        background_worker.add_to_queue(file_data)
+        
+        logger.info(f"✅ Queued for processing: {file_data['file_name']}")
+        return True
 
     return False
 

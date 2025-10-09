@@ -1098,6 +1098,14 @@ async def main():
     
     print("🤖 Telegram bot እየጀመር ነው...")
     
+    # Initialize background worker
+    from background_worker import background_worker
+    await background_worker.initialize(config.BOT_TOKEN)
+    
+    # Start background worker in separate task
+    asyncio.create_task(background_worker.start())
+    logger.info("🔄 Background Worker started in parallel")
+    
     # Create application with conflict resolution
     application = Application.builder().token(config.BOT_TOKEN).build()
     
