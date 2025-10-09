@@ -95,7 +95,7 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 • ሂሳብዎን ለማየት: ቀር ሂሳብ 💰
 • ገንዘብ ለመጨመር: ገቢ ለማድረግ 🏦
 
-ℹ️ ለተጨማሪ እገዛ ➽ [Admin](https://t.me/Henok_Chat) ✅"""
+ℹ️ ለተጨማሪ እገዛ ➽ @Henok_Chat ✅"""
         # Add back to main menu button
         keyboard = [
             [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
@@ -162,7 +162,7 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 • ትክክለኛ መጠን ማስገባት
 • ከላኩ በኋላ ብቻ Screenshot ይላኩ
 
-ℹ️ ለእገዛ ➽ [Admin](https://t.me/Henok_Chat) ✅"""
+ℹ️ ለእገዛ ➽ @Henok_Chat ✅"""
         # Add back to main menu button
         keyboard = [
             [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
@@ -216,7 +216,7 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 
 **💰 እንዴት ገንዘብ ማድረግ እችላለሁ?**
    • "ገቢ ለማድረግ 🏦" ይጫኑ
-   • Telebirr/CBEbirr/CBE/Card ይምረጡ
+   • Telebirr/CBE/CBEbirr/Card ይምረጡ
    • መመሪያውን ይከተሉ
    • ዝቅተኛ: 10 ብር
 
@@ -224,7 +224,7 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
    • ትክክለኛ ስም መጻፉን ያረጋግጡ
    • ቢያንስ 3 ፊደል ይጻፉ
    • "🎞 ሁሉንም ፊልም" ይሞክሩ
-   • Admin ያናግሩ: [Admin](https://t.me/Henok_Chat)
+   • Admin ያናግሩ: @Henok_Chat
 
 **💳 ገንዘብ መቼ ይገባል?**
    ⏱ በ30 ደቂቃ ውስጥ
@@ -243,7 +243,7 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 ━━━━━━━━━━━━━━━━━━━━━━
 💡 ለተጨማሪ ጥያቄዎች Admin ያነጋግሩ!
 
-📩 [Admin](https://t.me/Henok_Chat) ✅"""
+📩 @Henok_Chat ✅"""
         # Add back to main menu button
         keyboard = [
             [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
@@ -278,7 +278,7 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 ━━━━━━━━━━━━━━━━━━━━━━
 📱 **የAdmin መገናኛ:**
 
-💬 Telegram: [Admin](https://t.me/Henok_Chat)
+💬 Telegram: @Henok_Chat
 ⏰ የምላሽ ጊዜ: በቅርቡ
 ✅ ሁሌም ድጋፍ ዝግጁ ነው!
 
@@ -290,7 +290,7 @@ async def handle_usage_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 • ገንዘብ በ30 ደቂቃ ውስጥ ይገባል
 • የመጋበዝ ስርዓት ሽልማት አለው
 
-ℹ️ ለማንኛውም ጥያቄ ➽ [Admin](https://t.me/Henok_Chat) ✅"""
+ℹ️ ለማንኛውም ጥያቄ ➽ @Henok_Chat ✅"""
         # Add back to main menu button
         keyboard = [
             [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
@@ -373,7 +373,7 @@ async def show_single_movie_help(update: Update, context: ContextTypes.DEFAULT_T
 • ሂሳብዎን ለማየት: ቀር ሂሳብ 💰
 • ገንዘብ ለመጨመር: ገቢ ለማድረግ 🏦
 
-ℹ️ ለተጨማሪ እገዛ ➽ [Admin](https://t.me/Henok_Chat) ✅"""
+ℹ️ ለተጨማሪ እገዛ ➽ @Henok_Chat ✅"""
     keyboard = [
         [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
         [InlineKeyboardButton("🏠 ወደ ዋና ምናሌ", callback_data="usage_back_to_menu")]
@@ -427,7 +427,7 @@ async def show_series_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • ሂሳብዎን ለማየት: ቀር ሂሳብ 💰
 • ገንዘብ ለመጨመር: ገቢ ለማድረግ 🏦
 
-ℹ️ ለተጨማሪ እገዛ ➽ [Admin](https://t.me/Henok_Chat) ✅"""
+ℹ️ ለተጨማሪ እገዛ ➽ @Henok_Chat ✅"""
     keyboard = [
         [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
         [InlineKeyboardButton("🏠 ወደ ዋና ምናሌ", callback_data="usage_back_to_menu")]
@@ -481,7 +481,7 @@ async def show_all_films_help(update: Update, context: ContextTypes.DEFAULT_TYPE
 • ሂሳብዎን ለማየት: ቀር ሂሳብ 💰
 • ገንዘብ ለመጨመር: ገቢ ለማድረግ 🏦
 
-ℹ️ ለተጨማሪ እገዛ ➽ [Admin](https://t.me/Henok_Chat) ✅"""
+ℹ️ ለተጨማሪ እገዛ ➽ @Henok_Chat ✅"""
     keyboard = [
         [InlineKeyboardButton("🔙 ወደ አጠቃቀም ምናሌ", callback_data="usage_menu")],
         [InlineKeyboardButton("🏠 ወደ ዋና ምናሌ", callback_data="usage_back_to_menu")]
