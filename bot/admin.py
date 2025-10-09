@@ -56,7 +56,8 @@ class AdminPanel:
         keyboard = [
             [InlineKeyboardButton("📺 ቻነል ቅንብሮች", callback_data="admin_channels")],
             [InlineKeyboardButton("💰 ሂሳብ ለመቆጣጠር", callback_data="admin_finance")],
-            [InlineKeyboardButton("👥 የተጠቃሚዎች ስታቲስቲክስ", callback_data="admin_users")],
+            [InlineKeyboardButton("👥 የተጠቃሚዎች አስተዳደር", callback_data="admin_user_management")],
+            [InlineKeyboardButton("📊 የተጠቃሚዎች ስታቲስቲክስ", callback_data="admin_users")],
             [InlineKeyboardButton("🎬 የፊልም ስታቲስቲክስ", callback_data="admin_movies")],
             [InlineKeyboardButton("🎁 የግብዣ ስታቲስቲክስ", callback_data="admin_referrals")],
             [InlineKeyboardButton("⚙️ የቦት ቅንብሮች", callback_data="admin_settings")]
@@ -82,55 +83,55 @@ class AdminPanel:
         import re
         from datetime import datetime, timedelta
         import os
-        
+
         try:
             stats = {'today': 0, 'week': 0, 'total': 0}
-            
+
             # Patterns for duplicate detection
             log_patterns = [
                 r'🗑️ Deleted duplicate from channel:',
                 r'🚫 Duplicate BLOCKED from database:',
                 r'⚡ INSTANT BLOCK:'
             ]
-            
+
             now = datetime.now()
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             week_start = now - timedelta(days=7)
-            
+
             # Search in multiple locations
             log_locations = [
                 '.',           # Current directory
                 'bot/',        # Bot directory
                 '../',         # Parent directory
             ]
-            
+
             found_logs = False
-            
+
             for location in log_locations:
                 if not os.path.exists(location):
                     continue
-                    
+
                 try:
                     log_files = [f for f in os.listdir(location) if f.endswith('.log')]
-                    
+
                     for log_file in log_files:
                         found_logs = True
                         full_path = os.path.join(location, log_file)
-                        
+
                         with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
                             for line in f:
                                 # Check if line contains any duplicate pattern
                                 is_duplicate = any(pattern in line for pattern in log_patterns)
-                                
+
                                 if is_duplicate:
                                     stats['total'] += 1
-                                    
+
                                     # Parse timestamp - multiple formats
                                     timestamp_patterns = [
                                         r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})',  # 2025-01-09 08:19:38
                                         r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})',  # ISO format
                                     ]
-                                    
+
                                     for ts_pattern in timestamp_patterns:
                                         timestamp_match = re.search(ts_pattern, line)
                                         if timestamp_match:
@@ -153,12 +154,12 @@ class AdminPanel:
                 except Exception as e:
                     logger.debug(f"Could not read logs from {location}: {e}")
                     continue
-            
+
             if not found_logs:
                 logger.warning("⚠️ No log files found for duplicate stats")
-            
+
             return stats
-            
+
         except Exception as e:
             logger.error(f"Error getting duplicate stats: {e}")
             return {'today': 0, 'week': 0, 'total': 0}
@@ -250,6 +251,9 @@ class AdminPanel:
             await self.show_admin_main_menu(query, context)
         elif data == "admin_referrals":
             await self.show_referral_statistics(query, context)
+        elif data == "admin_user_management":
+            await self.show_user_management(query, context)
+
 
     async def show_channel_settings(self, query, context):
         """Show channel settings menu"""
@@ -311,7 +315,7 @@ class AdminPanel:
                     LIMIT 1
                 """)
                 highest_balance_user = cursor.fetchone()
-                
+
                 # Get payment statistics
                 cursor = conn.execute("""
                     SELECT COUNT(*), COALESCE(SUM(amount), 0) 
@@ -438,7 +442,7 @@ class AdminPanel:
                     WHERE joined_date >= date('now', '-1 day')
                 """)
                 today_movies = cursor.fetchone()[0] or 0
-                
+
                 cursor = conn.execute("""
                     SELECT COUNT(*) FROM single_movies 
                     WHERE joined_date >= date('now', '-7 days')
@@ -457,7 +461,7 @@ class AdminPanel:
                     WHERE joined_date >= date('now', '-1 day')
                 """)
                 today_series = cursor.fetchone()[0] or 0
-                
+
                 cursor = conn.execute("""
                     SELECT COUNT(*) FROM series 
                     WHERE joined_date >= date('now', '-7 days')
@@ -471,16 +475,16 @@ class AdminPanel:
                     WHERE download_date >= date('now', '-1 day')
                 """)
                 today_downloads = cursor.fetchone()[0] or 0
-                
+
                 cursor = conn.execute("""
                     SELECT COUNT(*) FROM download_logs 
                     WHERE download_date >= date('now', '-7 days')
                 """)
                 week_downloads = cursor.fetchone()[0] or 0
-                
+
                 cursor = conn.execute("SELECT COUNT(*) FROM download_logs")
                 total_downloads = cursor.fetchone()[0] or 0
-                
+
                 # Top downloaded movies
                 cursor = conn.execute("""
                     SELECT file_name, COUNT(*) as count 
@@ -491,15 +495,15 @@ class AdminPanel:
                     LIMIT 5
                 """)
                 top_downloads = cursor.fetchall()
-            
+
             # Background Worker stats
             from background_worker import background_worker
             worker_stats = background_worker.get_stats()
-            
+
             # Get instant block count from single.py and series.py
             from single import instant_blocks_count as single_instant_blocks
             from series import instant_blocks_count as series_instant_blocks
-            
+
             # Total duplicates = background worker blocks + instant blocks
             total_duplicates = worker_stats.get('duplicates_blocked', 0) + single_instant_blocks + series_instant_blocks
 
@@ -607,7 +611,7 @@ class AdminPanel:
                             name = first_name
                         else:
                             name = f"User {user_id}"
-                        
+
                         top_referrers_list.append(
                             f"{rank}. {name}\n"
                             f"   👥 {ref_count} ግብዣዎች | 💰 {earnings} ብር"
@@ -655,7 +659,8 @@ class AdminPanel:
         keyboard = [
             [InlineKeyboardButton("📺 ቻነል ቅንብሮች", callback_data="admin_channels")],
             [InlineKeyboardButton("💰 ሂሳብ ለመቆጣጠር", callback_data="admin_finance")],
-            [InlineKeyboardButton("👥 የተጠቃሚዎች ስታቲስቲክስ", callback_data="admin_users")],
+            [InlineKeyboardButton("👥 የተጠቃሚዎች አስተዳደር", callback_data="admin_user_management")],
+            [InlineKeyboardButton("📊 የተጠቃሚዎች ስታቲስቲክስ", callback_data="admin_users")],
             [InlineKeyboardButton("🎬 የፊልም ስታቲስቲክስ", callback_data="admin_movies")],
             [InlineKeyboardButton("🎁 የግብዣ ስታቲስቲክስ", callback_data="admin_referrals")],
             [InlineKeyboardButton("⚙️ የቦት ቅንብሮች", callback_data="admin_settings")]
@@ -1055,6 +1060,19 @@ class AdminPanel:
 
     async def show_user_management(self, query, context):
         """Show user management options"""
+        keyboard = [
+            [InlineKeyboardButton("🔍 የተጠቃሚ ፍለጋ", callback_data="admin_user_search")],
+            [InlineKeyboardButton("📝 የተጠቃሚ ዝርዝር", callback_data="admin_user_list")],
+            [InlineKeyboardButton("🚫 የታገዱ ተጠቃሚዎች", callback_data="admin_blocked_users")],
+            [InlineKeyboardButton("🔙 ወደ Admin Panel", callback_data="back_to_admin")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            "👥 **የተጠቃሚዎች አስተዳደር**\n\n"
+            "ምን ማድረግ ይፈልጋሉ?",
+            reply_markup=reply_markup
+        )
 
 # Create global admin instance
 admin_panel = AdminPanel()
