@@ -474,6 +474,60 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer("🚫 እርስዎ ተገድበዋል።", show_alert=True)
         return
 
+    # Handle search again buttons
+    if data == "search_again_movie":
+        await query.answer()
+        await query.message.delete()
+        from telegram import ReplyKeyboardMarkup, KeyboardButton
+        back_keyboard = [[KeyboardButton("⬅️ ለመመለስ")]]
+        back_reply_markup = ReplyKeyboardMarkup(back_keyboard, resize_keyboard=True)
+        await context.bot.send_message(
+            chat_id=query.message.chat.id,
+            text="የምፈልጉትን ነጠላ ፊልም ስም ይጻፉ:",
+            reply_markup=back_reply_markup
+        )
+        USER_STATES[user_id] = WAITING_FOR_MOVIE_SEARCH
+        return
+    
+    elif data == "search_again_series":
+        await query.answer()
+        await query.message.delete()
+        from telegram import ReplyKeyboardMarkup, KeyboardButton
+        back_keyboard = [[KeyboardButton("⬅️ ለመመለስ")]]
+        back_reply_markup = ReplyKeyboardMarkup(back_keyboard, resize_keyboard=True)
+        await context.bot.send_message(
+            chat_id=query.message.chat.id,
+            text="የምፈልጉትን ተከታታይ ፊልም ስም ይጻፉ:",
+            reply_markup=back_reply_markup
+        )
+        USER_STATES[user_id] = WAITING_FOR_SERIES_SEARCH
+        return
+    
+    elif data == "search_again_all":
+        await query.answer()
+        await query.message.delete()
+        from telegram import ReplyKeyboardMarkup, KeyboardButton
+        back_keyboard = [[KeyboardButton("⬅️ ለመመለስ")]]
+        back_reply_markup = ReplyKeyboardMarkup(back_keyboard, resize_keyboard=True)
+        await context.bot.send_message(
+            chat_id=query.message.chat.id,
+            text="የምፈልጉትን ፊልም ስም ይጻፉ (ነጠላ ወይም ተከታታይ):",
+            reply_markup=back_reply_markup
+        )
+        USER_STATES[user_id] = WAITING_FOR_ALL_SEARCH
+        return
+    
+    elif data == "go_home":
+        await query.answer()
+        await query.message.delete()
+        USER_STATES.pop(user_id, None)
+        await context.bot.send_message(
+            chat_id=query.message.chat.id,
+            text="🏠 ዋና ምናሌ",
+            reply_markup=get_main_keyboard()
+        )
+        return
+
     # Handle all films pagination
     if data.startswith("all_prev_") or data.startswith("all_next_"):
         from telegram import InlineKeyboardMarkup, InlineKeyboardButton

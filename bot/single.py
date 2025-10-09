@@ -171,16 +171,18 @@ async def handle_movie_search(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Don't return - keep state active so user can search again
         return
 
-    # Pagination settings
-    per_page = 5
-    total_pages = (len(all_results) + per_page - 1) // per_page
+    # Pagination settings - 10 items per page, max 5 pages (50 items total)
+    per_page = 10
+    max_items = 50  # 5 pages × 10 items
+    limited_results = all_results[:max_items]
+    total_pages = (len(limited_results) + per_page - 1) // per_page
 
     # Get current page results
     start_idx = page * per_page
     end_idx = start_idx + per_page
-    current_page_results = all_results[start_idx:end_idx]
+    current_page_results = limited_results[start_idx:end_idx]
 
-    # Create inline keyboard with movie options (5 per page)
+    # Create inline keyboard with movie options (10 per page)
     keyboard = []
     for i, (file_id, file_name, file_title) in enumerate(current_page_results):
         # Prioritize file_name over file_title for display
@@ -189,7 +191,7 @@ async def handle_movie_search(update: Update, context: ContextTypes.DEFAULT_TYPE
         display_title = display_name[:45] + "..." if len(display_name) > 45 else display_name
         # Use actual index from all results for callback
         keyboard.append([InlineKeyboardButton(
-            f"🎬 *{display_title}*", 
+            f"🎬 {display_title}", 
             callback_data=f"movie_{start_idx + i}"
         )])
 
@@ -202,6 +204,12 @@ async def handle_movie_search(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if pagination_row:
         keyboard.append(pagination_row)
+
+    # Add search and home buttons at the bottom
+    keyboard.append([
+        InlineKeyboardButton("🔍 ሌላ ለመፈለግ", callback_data="search_again_movie"),
+        InlineKeyboardButton("🏠 Home", callback_data="go_home")
+    ])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
