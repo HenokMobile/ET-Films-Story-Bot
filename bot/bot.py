@@ -1194,7 +1194,7 @@ async def handle_bot_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Message text: {update.effective_message.text[:100] if update.effective_message.text else 'N/A'}")
 
 async def send_startup_notifications(application):
-    """Send startup notifications to pending users and admin"""
+    """Send startup statistics to admin only - no user notifications"""
     try:
         from series import SeriesManager
         from single import SingleMovieManager
@@ -1207,66 +1207,17 @@ async def send_startup_notifications(application):
         series_count = series_mgr.get_series_count()
         movies_count = movie_mgr.get_movies_count()
         
-        # Collect pending user IDs from recent updates
-        pending_users = set()
-        
-        # Get pending updates
-        try:
-            updates = await application.bot.get_updates(timeout=1)
-            for update in updates:
-                if update.message and update.message.from_user:
-                    pending_users.add(update.message.from_user.id)
-                elif update.callback_query and update.callback_query.from_user:
-                    pending_users.add(update.callback_query.from_user.id)
-        except Exception as e:
-            logger.warning(f"Could not fetch pending updates: {e}")
-        
-        # Send notifications to pending users
-        success_count = 0
-        failed_count = 0
-        
-        user_notification = (
-            "🤖 *Bot እንደገና ተጀምሯል!*\n\n"
-            "✅ አሁን መስራት ጀምሯል\n"
-            "📱 የሚፈልጉትን ፊልም መፈለግ ይችላሉ\n\n"
-            "💡 *ለማስታወሻ:*\n"
-            "• ነጠላ ፊልም - 3 ብር\n"
-            "• ተከታታይ ፊልም - 2 ብር\n\n"
-            "🎬 እንኳን ደህና መጡ!"
-        )
-        
-        for user_id in pending_users:
-            try:
-                # Skip admin
-                if user_id == config.ADMIN_USER_ID:
-                    continue
-                    
-                await application.bot.send_message(
-                    chat_id=user_id,
-                    text=user_notification,
-                    parse_mode='Markdown'
-                )
-                success_count += 1
-                
-                # Rate limiting - 20 messages per second
-                if success_count % 20 == 0:
-                    await asyncio.sleep(1)
-                    
-            except Exception as e:
-                logger.warning(f"Failed to notify user {user_id}: {e}")
-                failed_count += 1
-        
-        # Send admin report
+        # Send admin report only
         admin_message = (
             "🤖 *ET Films Bot ተጀምሯል!*\n\n"
             f"✅ Series Database: {series_count:,} ፋይሎች\n"
             f"✅ Single Movies Database: {movies_count:,} ፋይሎች\n"
             f"✅ Duplicate Detection: ዝግጁ\n\n"
             "━━━━━━━━━━━━━━━━━━━\n\n"
-            "📊 *Startup Notifications:*\n"
-            f"• Pending Users: {len(pending_users):,}\n"
-            f"• Notifications Sent: {success_count:,} ✅\n"
-            f"• Failed: {failed_count:,} ❌\n\n"
+            "📊 *Startup Status:*\n"
+            "• Bot እንደገና ተጀምሯል\n"
+            "• ዝግ እያለ የተላኩ መልእክቶች ተሰርዘዋል\n"
+            "• ምንም notification ወደ ተጠቃሚዎች አልተላከም\n\n"
             "💡 *Duplicate Prevention System:*\n"
             "   • File\\_name + File\\_size 100% ተመሳሳይ ከሆነ:\n"
             "      → ከChannel ይሰረዛል\n"
@@ -1279,10 +1230,7 @@ async def send_startup_notifications(application):
             parse_mode='Markdown'
         )
         
-        logger.info(
-            f"✅ Startup notifications complete: "
-            f"{success_count} sent, {failed_count} failed to {len(pending_users)} users"
-        )
+        logger.info("✅ Bot started - admin notified, no user notifications sent")
         
     except Exception as e:
         logger.error(f"❌ Error in startup notifications: {e}")
