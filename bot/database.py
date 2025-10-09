@@ -27,7 +27,8 @@ class DatabaseManager:
                     referrer_id INTEGER DEFAULT NULL,
                     referral_count INTEGER DEFAULT 0,
                     total_referral_earnings INTEGER DEFAULT 0,
-                    joined_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    joined_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
 
@@ -51,6 +52,11 @@ class DatabaseManager:
 
             try:
                 conn.execute('ALTER TABLE users ADD COLUMN total_referral_earnings INTEGER DEFAULT 0')
+            except sqlite3.OperationalError:
+                pass
+
+            try:
+                conn.execute('ALTER TABLE users ADD COLUMN last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
             except sqlite3.OperationalError:
                 pass
 
@@ -334,6 +340,34 @@ class DatabaseManager:
                 logger.info(f"Download logged: user={user_id}, file={file_name}, type={file_type}")
         except Exception as e:
             logger.error(f"Error logging download: {e}")
+
+    def update_last_active(self, user_id):
+        """Update user's last active timestamp"""
+        try:
+            with sqlite3.connect(config.USER_DB_PATH) as conn:
+                conn.execute('''
+                    UPDATE users 
+                    SET last_active = CURRENT_TIMESTAMP 
+                    WHERE user_id = ?
+                ''', (user_id,))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Error updating last_active for user {user_id}: {e}")
+
+    def get_recent_active_users(self, hours=24):
+        """Get users active in the last N hours"""
+        try:
+            with sqlite3.connect(config.USER_DB_PATH) as conn:
+                cursor = conn.execute('''
+                    SELECT user_id, first_name, username 
+                    FROM users 
+                    WHERE last_active >= datetime('now', '-' || ? || ' hours')
+                    AND user_id != ?
+                ''', (hours, config.ADMIN_USER_ID))
+                return cursor.fetchall()
+        except Exception as e:
+            logger.error(f"Error getting recent active users: {e}")
+            return []
 
 
 # Global database instance
