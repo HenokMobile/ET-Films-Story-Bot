@@ -1212,11 +1212,7 @@ async def send_startup_notifications(application):
             "🤖 *ET Films Bot ተጀምሯል!*\n\n"
             f"✅ Series Database: {series_count:,} ፋይሎች\n"
             f"✅ Single Movies Database: {movies_count:,} ፋይሎች\n"
-            f"✅ Duplicate Detection: ዝግጁ\n\n"
-            "💡 *Duplicate Prevention System:*\n"
-            "   • File\\_name + File\\_size 100% ተመሳሳይ ከሆነ:\n"
-            "      → ከChannel ይሰረዛል\n"
-            "      → ለእርስዎ ሪፖርት ይደረጋል"
+            f"✅ Duplicate Detection: ዝግጁ"
         )
         
         await application.bot.send_message(
