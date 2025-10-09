@@ -491,13 +491,19 @@ class AdminPanel:
                     LIMIT 5
                 """)
                 top_downloads = cursor.fetchall()
-
-            # NEW: Duplicate statistics from logs
-            duplicate_stats = self.get_duplicate_stats_from_logs()
             
-            # Background Worker stats
+            # Background Worker stats - includes duplicates_blocked count
             from background_worker import background_worker
             worker_stats = background_worker.get_stats()
+            
+            # Get instant block count from single.py and series.py logs
+            import single
+            import series
+            instant_blocks_single = getattr(single, 'instant_blocks_count', 0)
+            instant_blocks_series = getattr(series, 'instant_blocks_count', 0)
+            
+            # Total duplicates = background worker blocks + instant blocks
+            total_duplicates = worker_stats.get('duplicates_blocked', 0) + instant_blocks_single + instant_blocks_series
 
         except Exception as e:
             logger.error(f"Error fetching movie statistics: {e}")
@@ -506,7 +512,7 @@ class AdminPanel:
             total_movie_size = total_series_size = 0
             today_downloads = week_downloads = total_downloads = 0
             top_downloads = []
-            duplicate_stats = {'today': 0, 'week': 0, 'total': 0}
+            total_duplicates = 0
             worker_stats = {'queue_size': 0, 'processed': 0, 'duplicates_blocked': 0, 'errors': 0}
 
         # Calculate sizes in GB/MB
@@ -551,9 +557,9 @@ class AdminPanel:
             f"• Errors: {worker_stats['errors']:,}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
             "🚫 የDuplicate መከላከያ:\n"
-            f"• ዛሬ የታገዱ: {duplicate_stats['today']:,}\n"
-            f"• በሳምንት የታገዱ: {duplicate_stats['week']:,}\n"
-            f"• ጠቅላላ የታገዱ: {duplicate_stats['total']:,}\n\n"
+            f"• ⚡ Instant Blocks: {instant_blocks_single + instant_blocks_series:,}\n"
+            f"• 🗑️ Queue Blocks: {worker_stats['duplicates_blocked']:,}\n"
+            f"• ጠቅላላ የታገዱ: {total_duplicates:,}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
             "📈 የDownload ስታቲስቲክስ:\n"
             f"• ዛሬ የተላኩ ፊልሞች: {today_downloads:,}\n"

@@ -3,8 +3,12 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 import config
+import asyncio
 
 logger = logging.getLogger(__name__)
+
+# Global counter for instant blocks
+instant_blocks_count = 0
 
 class SeriesManager:
     def __init__(self):
@@ -244,6 +248,7 @@ async def handle_series_search(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def handle_series_channel_post(message, channel_id):
     """Handle new series posts with quick pre-check and queue system"""
+    global instant_blocks_count # Access the global counter
     if message.document or message.video:
         file_obj = message.document or message.video
 
@@ -263,15 +268,15 @@ async def handle_series_channel_post(message, channel_id):
             import sqlite3
             with sqlite3.connect(config.SERIES_DB_PATH) as conn:
                 cursor = conn.cursor()
-                
+
                 # Quick name-only check for instant blocking
                 cursor.execute('''
                     SELECT id, file_size FROM series 
                     WHERE file_name = ? LIMIT 1
                 ''', (file_data['file_name'],))
-                
+
                 existing = cursor.fetchone()
-                
+
                 if existing and existing[1] == file_data['file_size']:
                     # 100% exact match - INSTANT DELETE
                     try:
@@ -281,7 +286,8 @@ async def handle_series_channel_post(message, channel_id):
                             chat_id=channel_id,
                             message_id=message.message_id
                         )
-                        logger.info(f"⚡ INSTANT BLOCK: {file_data['file_name']}")
+                        logger.info(f"🚫 INSTANT BLOCK: {file_data['file_name']}")
+                        instant_blocks_count += 1 # Increment the counter
                         return False
                     except Exception as e:
                         logger.error(f"❌ Error deleting instant duplicate: {e}")
@@ -289,7 +295,7 @@ async def handle_series_channel_post(message, channel_id):
         # 📋 ADD TO BACKGROUND QUEUE for deep processing
         from background_worker import background_worker
         background_worker.add_to_queue(file_data)
-        
+
         logger.info(f"✅ Queued for processing: {file_data['file_name']}")
         return True
 

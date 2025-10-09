@@ -7,6 +7,9 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+# Global counter for instant blocks
+instant_blocks_count = 0
+
 class SingleMovieManager:
     def __init__(self):
         self.setup_database()
@@ -267,7 +270,9 @@ async def handle_movie_channel_post(message, channel_id):
                             chat_id=channel_id,
                             message_id=message.message_id
                         )
-                        logger.info(f"⚡ INSTANT BLOCK: {file_data['file_name']}")
+                        global instant_blocks_count
+                        instant_blocks_count += 1
+                        logger.info(f"⚡ INSTANT BLOCK: {file_data['file_name']} (Total: {instant_blocks_count})")
                         return False
                     except Exception as e:
                         logger.error(f"❌ Error deleting instant duplicate: {e}")
