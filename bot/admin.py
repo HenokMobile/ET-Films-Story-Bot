@@ -492,18 +492,16 @@ class AdminPanel:
                 """)
                 top_downloads = cursor.fetchall()
             
-            # Background Worker stats - includes duplicates_blocked count
+            # Background Worker stats
             from background_worker import background_worker
             worker_stats = background_worker.get_stats()
             
-            # Get instant block count from single.py and series.py logs
-            import single
-            import series
-            instant_blocks_single = getattr(single, 'instant_blocks_count', 0)
-            instant_blocks_series = getattr(series, 'instant_blocks_count', 0)
+            # Get instant block count from single.py and series.py
+            from single import instant_blocks_count as single_instant_blocks
+            from series import instant_blocks_count as series_instant_blocks
             
             # Total duplicates = background worker blocks + instant blocks
-            total_duplicates = worker_stats.get('duplicates_blocked', 0) + instant_blocks_single + instant_blocks_series
+            total_duplicates = worker_stats.get('duplicates_blocked', 0) + single_instant_blocks + series_instant_blocks
 
         except Exception as e:
             logger.error(f"Error fetching movie statistics: {e}")
@@ -557,7 +555,8 @@ class AdminPanel:
             f"• Errors: {worker_stats['errors']:,}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
             "🚫 የDuplicate መከላከያ:\n"
-            f"• ⚡ Instant Blocks: {instant_blocks_single + instant_blocks_series:,}\n"
+            f"• ⚡ Instant Blocks (ነጠላ): {single_instant_blocks:,}\n"
+            f"• ⚡ Instant Blocks (ተከታታይ): {series_instant_blocks:,}\n"
             f"• 🗑️ Queue Blocks: {worker_stats['duplicates_blocked']:,}\n"
             f"• ጠቅላላ የታገዱ: {total_duplicates:,}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
