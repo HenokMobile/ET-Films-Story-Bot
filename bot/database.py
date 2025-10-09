@@ -126,6 +126,14 @@ class DatabaseManager:
                 conn.execute('ALTER TABLE single_movies ADD COLUMN file_size INTEGER DEFAULT 0')
             except sqlite3.OperationalError:
                 pass
+            
+            # Create indexes for faster search
+            try:
+                conn.execute('CREATE INDEX IF NOT EXISTS idx_single_filename ON single_movies(file_name)')
+                conn.execute('CREATE INDEX IF NOT EXISTS idx_single_filesize ON single_movies(file_size)')
+                logger.info("✅ Created indexes for single_movies")
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Index creation warning: {e}")
 
         # Series database
         with sqlite3.connect(config.SERIES_DB_PATH) as conn:
@@ -148,6 +156,14 @@ class DatabaseManager:
                 conn.execute('ALTER TABLE series ADD COLUMN file_size INTEGER DEFAULT 0')
             except sqlite3.OperationalError:
                 pass
+            
+            # Create indexes for faster search
+            try:
+                conn.execute('CREATE INDEX IF NOT EXISTS idx_series_filename ON series(file_name)')
+                conn.execute('CREATE INDEX IF NOT EXISTS idx_series_filesize ON series(file_size)')
+                logger.info("✅ Created indexes for series")
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Index creation warning: {e}")
         
         # Download logs table in user database
         with sqlite3.connect(config.USER_DB_PATH) as conn:
