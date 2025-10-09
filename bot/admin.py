@@ -81,46 +81,81 @@ class AdminPanel:
         """Extract duplicate statistics from log files"""
         import re
         from datetime import datetime, timedelta
+        import os
         
         try:
             stats = {'today': 0, 'week': 0, 'total': 0}
             
-            # Read log file (assuming default Python logging to bot.log or similar)
-            # Adjust path as needed
+            # Patterns for duplicate detection
             log_patterns = [
-                r'🗑️ Deleted duplicate from channel: (.+)',
-                r'🚫 Duplicate BLOCKED from database: (.+)'
+                r'🗑️ Deleted duplicate from channel:',
+                r'🚫 Duplicate BLOCKED from database:',
+                r'⚡ INSTANT BLOCK:'
             ]
             
             now = datetime.now()
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             week_start = now - timedelta(days=7)
             
-            # Try to read from logs (you may need to adjust the log file path)
-            try:
-                import os
-                log_files = [f for f in os.listdir('.') if f.endswith('.log')]
-                
-                for log_file in log_files:
-                    with open(log_file, 'r', encoding='utf-8') as f:
-                        for line in f:
-                            for pattern in log_patterns:
-                                if re.search(pattern, line):
+            # Search in multiple locations
+            log_locations = [
+                '.',           # Current directory
+                'bot/',        # Bot directory
+                '../',         # Parent directory
+            ]
+            
+            found_logs = False
+            
+            for location in log_locations:
+                if not os.path.exists(location):
+                    continue
+                    
+                try:
+                    log_files = [f for f in os.listdir(location) if f.endswith('.log')]
+                    
+                    for log_file in log_files:
+                        found_logs = True
+                        full_path = os.path.join(location, log_file)
+                        
+                        with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            for line in f:
+                                # Check if line contains any duplicate pattern
+                                is_duplicate = any(pattern in line for pattern in log_patterns)
+                                
+                                if is_duplicate:
                                     stats['total'] += 1
                                     
-                                    # Try to parse timestamp (format: 2025-01-09 08:19:38,340)
-                                    timestamp_match = re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
-                                    if timestamp_match:
-                                        try:
-                                            log_time = datetime.strptime(timestamp_match.group(1), '%Y-%m-%d %H:%M:%S')
-                                            if log_time >= today_start:
-                                                stats['today'] += 1
-                                            if log_time >= week_start:
-                                                stats['week'] += 1
-                                        except:
-                                            pass
-            except Exception as e:
-                logger.debug(f"Could not parse log files for duplicates: {e}")
+                                    # Parse timestamp - multiple formats
+                                    timestamp_patterns = [
+                                        r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})',  # 2025-01-09 08:19:38
+                                        r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})',  # ISO format
+                                    ]
+                                    
+                                    for ts_pattern in timestamp_patterns:
+                                        timestamp_match = re.search(ts_pattern, line)
+                                        if timestamp_match:
+                                            try:
+                                                ts_str = timestamp_match.group(1)
+                                                # Try both formats
+                                                for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S']:
+                                                    try:
+                                                        log_time = datetime.strptime(ts_str, fmt)
+                                                        if log_time >= today_start:
+                                                            stats['today'] += 1
+                                                        if log_time >= week_start:
+                                                            stats['week'] += 1
+                                                        break
+                                                    except:
+                                                        continue
+                                                break
+                                            except:
+                                                continue
+                except Exception as e:
+                    logger.debug(f"Could not read logs from {location}: {e}")
+                    continue
+            
+            if not found_logs:
+                logger.warning("⚠️ No log files found for duplicate stats")
             
             return stats
             
