@@ -178,6 +178,12 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle incoming messages"""
+    # Update bot status timestamp
+    import time
+    if 'bot_status' in globals():
+        globals()['bot_status']['last_update'] = time.time()
+        globals()['bot_status']['running'] = True
+    
     user = update.effective_user
     text = update.message.text
 
@@ -1210,14 +1216,21 @@ CHANNEL_QUEUE = None  # Will be initialized in main()
 async def channel_consumer():
     """Simple async queue feeder - no blocking calls for maximum throughput"""
     import time
+    import gc
 
     processed_count = 0
     error_count = 0
     start_time = time.time()
+    last_cleanup = time.time()
 
     logger.info("🚀 Channel Consumer started - async queue feeder mode!")
 
     while True:
+        # Periodic memory cleanup (every 5 minutes)
+        if time.time() - last_cleanup > 300:
+            gc.collect()
+            last_cleanup = time.time()
+            logger.info("🧹 Memory cleanup performed")
         try:
             # Get message from queue (blocks until available)
             message_data = await CHANNEL_QUEUE.get()
@@ -1338,13 +1351,31 @@ async def main():
     asyncio.create_task(channel_consumer())
     logger.info("🚀 Channel Consumer started - instant processing!")
 
+    # Bot status tracking for health check
+    bot_status = {'running': False, 'last_update': None}
+    
     # Start health check server for UptimeRobot
     async def health_check(request):
-        return web.Response(text="OK", status=200)
+        import time
+        current_time = time.time()
+        
+        # Check if bot received updates recently (within 5 minutes)
+        if bot_status['last_update']:
+            time_since_update = current_time - bot_status['last_update']
+            if time_since_update > 300:  # 5 minutes
+                return web.Response(text="STALE", status=503)
+        
+        status = "OK" if bot_status['running'] else "STARTING"
+        return web.Response(text=status, status=200)
+    
+    async def update_status(request):
+        bot_status['last_update'] = time.time()
+        return web.Response(text="Updated", status=200)
 
     app = web.Application()
     app.router.add_get('/', health_check)
     app.router.add_get('/health', health_check)
+    app.router.add_post('/ping', update_status)
     
     runner = web.AppRunner(app)
     await runner.setup()
@@ -1383,30 +1414,66 @@ async def main():
     # Initialize the application
     await application.initialize()
 
-    # Start polling with conflict handling
-    try:
-        await application.start()
+    # Start polling with conflict handling and auto-restart
+    retry_count = 0
+    max_retries = 999  # Infinite retries with backoff
+    
+    while retry_count < max_retries:
+        try:
+            await application.start()
 
-        # Wait a moment before starting polling
-        await asyncio.sleep(2)
+            # Wait a moment before starting polling
+            await asyncio.sleep(2)
 
-        await application.updater.start_polling(
-            allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True  # Drop pending updates - don't process messages sent while offline
-        )
+            await application.updater.start_polling(
+                allowed_updates=Update.ALL_TYPES,
+                drop_pending_updates=True,  # Drop pending updates
+                pool_timeout=30,  # Increase connection timeout
+                connect_timeout=30,
+                read_timeout=30,
+                write_timeout=30
+            )
 
-        print("✅ Bot started successfully! 🎬")
+            print("✅ Bot started successfully! 🎬")
+            retry_count = 0  # Reset on successful start
 
         # Send startup notifications to pending users and admin
-        await send_startup_notifications(application)
+            await send_startup_notifications(application)
+            
+            break  # Exit retry loop on success
 
-    except Exception as e:
-        if "Conflict" in str(e):
-            print("❌ አንድ ተጨማሪ Bot instance እየሮጠ ነው! እባክዎ አቁመው ይሞክሩ።")
-            return
-        else:
-            logger.error(f"Error starting bot: {e}")
-            raise
+        except Exception as e:
+            if "Conflict" in str(e):
+                print("❌ አንድ ተጨማሪ Bot instance እየሮጠ ነው! እባክዎ አቁመው ይሞክሩ።")
+                return
+            else:
+                retry_count += 1
+                backoff = min(retry_count * 5, 60)  # Max 60 seconds
+                logger.error(f"❌ Bot error (attempt {retry_count}): {e}")
+                logger.info(f"🔄 Restarting in {backoff} seconds...")
+                
+                # Notify admin of restart
+                try:
+                    await application.bot.send_message(
+                        chat_id=config.ADMIN_USER_ID,
+                        text=f"⚠️ Bot Restarting!\n\n"
+                             f"Error: {str(e)[:100]}\n"
+                             f"Retry: {retry_count}\n"
+                             f"Backoff: {backoff}s"
+                    )
+                except:
+                    pass
+                
+                await asyncio.sleep(backoff)
+                
+                # Cleanup before retry
+                try:
+                    await application.updater.stop()
+                    await application.stop()
+                except:
+                    pass
+                
+                continue  # Retry
 
     # Keep the application running
     try:
