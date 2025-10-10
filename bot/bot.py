@@ -1316,6 +1316,7 @@ async def main():
     """Start the bot"""
     import asyncio
     import signal
+    from aiohttp import web
 
     global CHANNEL_QUEUE
 
@@ -1336,6 +1337,20 @@ async def main():
     # Start channel consumer in separate task - NEW!
     asyncio.create_task(channel_consumer())
     logger.info("🚀 Channel Consumer started - instant processing!")
+
+    # Start health check server for UptimeRobot
+    async def health_check(request):
+        return web.Response(text="OK", status=200)
+
+    app = web.Application()
+    app.router.add_get('/', health_check)
+    app.router.add_get('/health', health_check)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    asyncio.create_task(site.start())
+    logger.info("🏥 Health check server started on port 8080")
 
     # Create application with conflict resolution
     application = Application.builder().token(config.BOT_TOKEN).build()
