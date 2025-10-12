@@ -405,13 +405,12 @@ class PaymentSystem:
                     
                     # Notify user
                     await update.message.reply_text(
-                        "🚫 **የጊዜያዊ ገደብ መልእክት**\n\n"
+                        "🚫 የጊዜያዊ ገደብ መልእክት\n\n"
                         "❌ 3 ጊዜ የተሳሳተ Screenshot ላኩ!\n\n"
                         "⏰ ለ24 ሰአት ከአገልግሎት ተገድበዋል።\n\n"
                         "📞 ለበለጠ መረጃ Admin ን ያነጋግሩ:\n"
                         "👉 @Henok_Chat",
-                        reply_markup=get_main_keyboard(),
-                        parse_mode='Markdown'
+                        reply_markup=get_main_keyboard()
                     )
                     
                     # Get user info
@@ -423,15 +422,14 @@ class PaymentSystem:
                     try:
                         await context.bot.send_message(
                             ADMIN_USER_ID,
-                            f"🚫 **Auto-Block Alert**\n\n"
+                            f"🚫 Auto-Block Alert\n\n"
                             f"👤 User: {first_name}\n"
                             f"🆔 ID: {user_id}\n"
                             f"📝 Username: @{username}\n\n"
                             f"❌ 3 ጊዜ የተሳሳተ Screenshot ላከ\n"
                             f"⏰ Blocked for: 24 hours\n"
                             f"📅 Block Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-                            f"Issues:\n" + "\n".join([f"• {issue}" for issue in issues]),
-                            parse_mode='Markdown'
+                            f"Issues:\n" + "\n".join([f"• {issue}" for issue in issues])
                         )
                     except Exception as e:
                         logger.error(f"Error notifying admin of auto-block: {e}")
