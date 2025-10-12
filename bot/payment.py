@@ -337,6 +337,20 @@ class PaymentSystem:
             # Parse JSON
             validation_result = json.loads(result_text)
             
+            # Handle array response - extract first item
+            if isinstance(validation_result, list):
+                if len(validation_result) > 0:
+                    validation_result = validation_result[0]
+                else:
+                    logger.error(f"AI returned empty array: {result_text}")
+                    return {
+                        'recommendation': 'manual_review',
+                        'confidence': 0,
+                        'issues': ['AI ባዶ መልስ መለሰ - በእጅ ይፈተሽ'],
+                        'is_genuine': False,
+                        'is_payment_app': False
+                    }
+            
             # Validate required fields
             if 'recommendation' not in validation_result or 'confidence' not in validation_result:
                 logger.error(f"AI response missing required fields: {result_text}")
