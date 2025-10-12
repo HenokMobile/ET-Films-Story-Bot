@@ -279,6 +279,15 @@ class AdminPanel:
                 parse_mode='Markdown'
             )
             self.user_states[query.from_user.id] = "WAITING_UNBLOCK_USER_ID"
+        elif data.startswith("quick_unblock_"):
+            from user_block import user_block_system
+            user_id = int(data.replace("quick_unblock_", ""))
+            
+            success, message = await user_block_system.unblock_user(query.from_user.id, user_id, context)
+            await query.answer(message, show_alert=True)
+            
+            # Refresh the blocked users list
+            await user_block_system.show_blocked_users(query, context, page=0)
 
 
     async def show_channel_settings(self, query, context):

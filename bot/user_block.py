@@ -25,9 +25,16 @@ class UserBlockSystem:
                     block_reason TEXT,
                     blocked_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     unblocked_date TIMESTAMP,
+                    unblock_date TIMESTAMP,
                     status TEXT DEFAULT 'blocked'
                 )
             ''')
+            
+            # Add unblock_date column if not exists (for auto-unblock)
+            try:
+                conn.execute('ALTER TABLE blocked_users ADD COLUMN unblock_date TIMESTAMP')
+            except sqlite3.OperationalError:
+                pass  # Column already exists
             
             # Add is_blocked column to users table if not exists
             try:
@@ -36,7 +43,7 @@ class UserBlockSystem:
                 pass  # Column already exists
     
     async def block_user(self, admin_id: int, user_id: int, reason: str = None, context=None):
-        """Block a user"""
+        """Block a user permanently"""
         try:
             with sqlite3.connect(config.USER_DB_PATH) as conn:
                 # Get user info
@@ -69,6 +76,7 @@ class UserBlockSystem:
                             blocked_by = ?,
                             block_reason = ?,
                             blocked_date = CURRENT_TIMESTAMP,
+                            unblock_date = NULL,
                             username = ?,
                             first_name = ?
                         WHERE user_id = ?
@@ -77,8 +85,8 @@ class UserBlockSystem:
                     # New block - insert new record
                     conn.execute('''
                         INSERT INTO blocked_users 
-                        (user_id, username, first_name, blocked_by, block_reason)
-                        VALUES (?, ?, ?, ?, ?)
+                        (user_id, username, first_name, blocked_by, block_reason, unblock_date)
+                        VALUES (?, ?, ?, ?, ?, NULL)
                     ''', (user_id, username, first_name, admin_id, reason))
                 
                 # Update users table
@@ -111,6 +119,67 @@ class UserBlockSystem:
                 
         except Exception as e:
             logger.error(f"Error blocking user: {e}")
+            return False, f"❌ Error: {str(e)}"
+    
+    async def block_user_temp(self, admin_id: int, user_id: int, reason: str = None, duration_hours: int = 24, context=None):
+        """Block a user temporarily (for auto-blocks)"""
+        from datetime import datetime, timedelta
+        
+        try:
+            with sqlite3.connect(config.USER_DB_PATH) as conn:
+                # Get user info
+                cursor = conn.execute('''
+                    SELECT username, first_name FROM users WHERE user_id = ?
+                ''', (user_id,))
+                user_info = cursor.fetchone()
+                
+                if not user_info:
+                    return False, "❌ ተጠቃሚ አልተገኘም!"
+                
+                username, first_name = user_info
+                unblock_date = (datetime.now() + timedelta(hours=duration_hours)).strftime('%Y-%m-%d %H:%M:%S')
+                
+                # Check if user exists in blocked_users table
+                cursor = conn.execute('''
+                    SELECT id, status FROM blocked_users 
+                    WHERE user_id = ?
+                ''', (user_id,))
+                
+                existing = cursor.fetchone()
+                
+                if existing:
+                    # Update existing record
+                    conn.execute('''
+                        UPDATE blocked_users 
+                        SET status = 'blocked', 
+                            blocked_by = ?,
+                            block_reason = ?,
+                            blocked_date = CURRENT_TIMESTAMP,
+                            unblock_date = ?,
+                            username = ?,
+                            first_name = ?
+                        WHERE user_id = ?
+                    ''', (admin_id, reason, unblock_date, username, first_name, user_id))
+                else:
+                    # New block - insert new record
+                    conn.execute('''
+                        INSERT INTO blocked_users 
+                        (user_id, username, first_name, blocked_by, block_reason, unblock_date)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ''', (user_id, username, first_name, admin_id, reason, unblock_date))
+                
+                # Update users table
+                conn.execute('''
+                    UPDATE users SET is_blocked = 1 WHERE user_id = ?
+                ''', (user_id,))
+                
+                conn.commit()
+                
+                display_name = f"@{username}" if username else first_name or f"User {user_id}"
+                return True, f"✅ {display_name} ለ{duration_hours} ሰአት ተገድቧል!"
+                
+        except Exception as e:
+            logger.error(f"Error temp blocking user: {e}")
             return False, f"❌ Error: {str(e)}"
     
     async def unblock_user(self, admin_id: int, user_id: int, context=None):
@@ -179,7 +248,9 @@ class UserBlockSystem:
             return False
     
     async def show_blocked_users(self, query, context, page=0):
-        """Show list of blocked users"""
+        """Show list of blocked users with unblock buttons"""
+        from datetime import datetime
+        
         try:
             with sqlite3.connect(config.USER_DB_PATH) as conn:
                 # Count total blocked users
@@ -189,11 +260,11 @@ class UserBlockSystem:
                 total = cursor.fetchone()[0]
                 
                 # Get paginated blocked users
-                limit = 10
+                limit = 5
                 offset = page * limit
                 
                 cursor = conn.execute('''
-                    SELECT user_id, username, first_name, block_reason, blocked_date
+                    SELECT user_id, username, first_name, block_reason, blocked_date, unblock_date
                     FROM blocked_users
                     WHERE status = 'blocked'
                     ORDER BY blocked_date DESC
@@ -208,19 +279,53 @@ class UserBlockSystem:
         
         text = f"🚫 የተገደቡ ተጠቃሚዎች (ጠቅላላ: {total})\n\n"
         
+        keyboard = []
+        
         if blocked_users:
-            for user_id, username, first_name, reason, blocked_date in blocked_users:
+            for user_id, username, first_name, reason, blocked_date, unblock_date in blocked_users:
                 display_name = f"@{username}" if username else first_name or f"User {user_id}"
-                date_str = blocked_date[:10] if blocked_date else "Unknown"
+                date_str = blocked_date[:16] if blocked_date else "Unknown"
                 reason_str = reason if reason else "No reason"
                 
-                text += f"👤 {display_name} (ID: {user_id})\n"
-                text += f"   📅 {date_str} | 📝 {reason_str}\n\n"
+                # Check if auto-unblock is set
+                if unblock_date:
+                    try:
+                        unblock_dt = datetime.strptime(unblock_date, '%Y-%m-%d %H:%M:%S')
+                        now = datetime.now()
+                        if unblock_dt > now:
+                            time_left = unblock_dt - now
+                            hours_left = int(time_left.total_seconds() / 3600)
+                            text += f"👤 {display_name}\n"
+                            text += f"   🆔 {user_id}\n"
+                            text += f"   📝 {reason_str}\n"
+                            text += f"   📅 {date_str}\n"
+                            text += f"   ⏰ Auto-unblock in: {hours_left}h\n\n"
+                        else:
+                            text += f"👤 {display_name}\n"
+                            text += f"   🆔 {user_id}\n"
+                            text += f"   📝 {reason_str}\n"
+                            text += f"   📅 {date_str}\n"
+                            text += f"   ⏰ Auto-unblock: Expired\n\n"
+                    except:
+                        text += f"👤 {display_name}\n"
+                        text += f"   🆔 {user_id}\n"
+                        text += f"   📝 {reason_str}\n"
+                        text += f"   📅 {date_str}\n\n"
+                else:
+                    text += f"👤 {display_name}\n"
+                    text += f"   🆔 {user_id}\n"
+                    text += f"   📝 {reason_str}\n"
+                    text += f"   📅 {date_str}\n\n"
+                
+                # Add unblock button for each user
+                keyboard.append([InlineKeyboardButton(
+                    f"✅ {display_name} አላቀቅ", 
+                    callback_data=f"quick_unblock_{user_id}"
+                )])
         else:
             text += "ምንም የተገደቡ ተጠቃሚዎች የሉም።"
         
         # Pagination
-        keyboard = []
         nav_buttons = []
         
         if page > 0:

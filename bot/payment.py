@@ -24,6 +24,7 @@ MIN_DEPOSIT_CARD = 10
 class PaymentSystem:
     def __init__(self):
         self.payment_sessions = {}
+        self.screenshot_attempts = {}  # Track failed screenshot attempts per user
         # Initialize Gemini AI
         try:
             api_key = os.getenv('GEMINI_API_KEY')
@@ -335,7 +336,7 @@ class PaymentSystem:
             return {'valid': True, 'message': f'AI validation error: {str(e)}'}
     
     async def process_screenshot(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Screenshot አፈጻጸም - AI validation ጋር"""
+        """Screenshot አፈጻጸም - AI validation ጋር እና 3x attempt limit"""
         user_id = update.effective_user.id
         session = self.payment_sessions.get(user_id)
 
@@ -367,13 +368,81 @@ class PaymentSystem:
             
             # Check validation result
             if validation_result.get('recommendation') == 'reject':
+                # Track failed attempts
+                if user_id not in self.screenshot_attempts:
+                    self.screenshot_attempts[user_id] = 0
+                
+                self.screenshot_attempts[user_id] += 1
+                attempts_left = 3 - self.screenshot_attempts[user_id]
+                
                 issues = validation_result.get('issues', ['Screenshot ትክክል አይደለም'])
-                await update.message.reply_text(
-                    f"❌ Screenshot ተቀባይነት አላገኘም!\n\n"
-                    f"ችግሮች:\n" + "\n".join([f"• {issue}" for issue in issues]) + 
-                    f"\n\nእባክዎ እውነተኛ የክፍያ screenshot ይላኩ።"
-                )
-                return
+                
+                if attempts_left > 0:
+                    await update.message.reply_text(
+                        f"❌ Screenshot ተቀባይነት አላገኘም!\n\n"
+                        f"ችግሮች:\n" + "\n".join([f"• {issue}" for issue in issues]) + 
+                        f"\n\n⚠️ የቀሩ እድሎች: {attempts_left}/3\n"
+                        f"እባክዎ እውነተኛ የክፍያ screenshot ይላኩ።"
+                    )
+                    return
+                else:
+                    # 3rd attempt failed - Block user for 24h
+                    from user_block import user_block_system
+                    from datetime import datetime, timedelta
+                    
+                    # Block user
+                    block_reason = f"3 ጊዜ የተሳሳተ Screenshot ላከ ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
+                    await user_block_system.block_user_temp(
+                        admin_id=ADMIN_USER_ID,
+                        user_id=user_id,
+                        reason=block_reason,
+                        duration_hours=24,
+                        context=context
+                    )
+                    
+                    # Import main keyboard
+                    from bot import get_main_keyboard
+                    
+                    # Notify user
+                    await update.message.reply_text(
+                        "🚫 **የጊዜያዊ ገደብ መልእክት**\n\n"
+                        "❌ 3 ጊዜ የተሳሳተ Screenshot ላኩ!\n\n"
+                        "⏰ ለ24 ሰአት ከአገልግሎት ተገድበዋል።\n\n"
+                        "📞 ለበለጠ መረጃ Admin ን ያነጋግሩ:\n"
+                        "👉 @Henok_Chat",
+                        reply_markup=get_main_keyboard(),
+                        parse_mode='Markdown'
+                    )
+                    
+                    # Get user info
+                    user_data = await context.bot.get_chat(user_id)
+                    username = user_data.username or 'N/A'
+                    first_name = user_data.first_name or 'Unknown'
+                    
+                    # Notify admin
+                    try:
+                        await context.bot.send_message(
+                            ADMIN_USER_ID,
+                            f"🚫 **Auto-Block Alert**\n\n"
+                            f"👤 User: {first_name}\n"
+                            f"🆔 ID: {user_id}\n"
+                            f"📝 Username: @{username}\n\n"
+                            f"❌ 3 ጊዜ የተሳሳተ Screenshot ላከ\n"
+                            f"⏰ Blocked for: 24 hours\n"
+                            f"📅 Block Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+                            f"Issues:\n" + "\n".join([f"• {issue}" for issue in issues]),
+                            parse_mode='Markdown'
+                        )
+                    except Exception as e:
+                        logger.error(f"Error notifying admin of auto-block: {e}")
+                    
+                    # Clear session
+                    if user_id in self.payment_sessions:
+                        del self.payment_sessions[user_id]
+                    if user_id in self.screenshot_attempts:
+                        del self.screenshot_attempts[user_id]
+                    
+                    return
             
             elif validation_result.get('recommendation') == 'manual_review':
                 # Low confidence - add warning but proceed
@@ -385,7 +454,10 @@ class PaymentSystem:
                 )
             
             else:
-                # Approved
+                # Approved - clear failed attempts
+                if user_id in self.screenshot_attempts:
+                    del self.screenshot_attempts[user_id]
+                
                 confidence = validation_result.get('confidence', 100)
                 await update.message.reply_text(
                     f"✅ Screenshot ተረጋግጧል! (confidence: {confidence}%)"
