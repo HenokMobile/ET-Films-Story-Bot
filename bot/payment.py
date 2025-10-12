@@ -315,26 +315,60 @@ class PaymentSystem:
 }
 """
             
-            # Send to Gemini
-            response = self.model.generate_content([prompt, image])
-            result_text = response.text
+            # Send to Gemini with strict JSON response
+            response = self.model.generate_content(
+                [prompt, image],
+                generation_config={
+                    'temperature': 0.1,  # More consistent responses
+                    'response_mime_type': 'application/json'  # Force JSON output
+                }
+            )
+            result_text = response.text.strip()
             
             # Parse JSON response
             import json
+            
             # Extract JSON from markdown code blocks if present
             if '```json' in result_text:
                 result_text = result_text.split('```json')[1].split('```')[0].strip()
             elif '```' in result_text:
                 result_text = result_text.split('```')[1].split('```')[0].strip()
             
+            # Parse JSON
             validation_result = json.loads(result_text)
             
-            logger.info(f"AI Validation Result: {validation_result}")
+            # Validate required fields
+            if 'recommendation' not in validation_result or 'confidence' not in validation_result:
+                logger.error(f"AI response missing required fields: {result_text}")
+                return {
+                    'recommendation': 'manual_review',
+                    'confidence': 0,
+                    'issues': ['AI response ትክክል አልሆነም - በእጅ ይፈተሽ'],
+                    'is_genuine': False,
+                    'is_payment_app': False
+                }
+            
+            logger.info(f"✅ AI Validation Result: {validation_result}")
             return validation_result
             
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ AI JSON parsing error: {e}\nResponse text: {result_text if 'result_text' in locals() else 'N/A'}")
+            return {
+                'recommendation': 'manual_review',
+                'confidence': 0,
+                'issues': ['AI response በትክክል አልተመለሰም - በእጅ ይፈተሽ'],
+                'is_genuine': False,
+                'is_payment_app': False
+            }
         except Exception as e:
-            logger.error(f"AI validation error: {e}")
-            return {'valid': True, 'message': f'AI validation error: {str(e)}'}
+            logger.error(f"❌ AI validation error: {e}")
+            return {
+                'recommendation': 'manual_review',
+                'confidence': 0,
+                'issues': [f'AI ስህተት: {str(e)}'],
+                'is_genuine': False,
+                'is_payment_app': False
+            }
     
     async def process_screenshot(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Screenshot አፈጻጸም - AI validation ጋር እና 3x attempt limit"""
