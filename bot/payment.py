@@ -512,9 +512,9 @@ class PaymentSystem:
                 if user_id in self.screenshot_attempts:
                     del self.screenshot_attempts[user_id]
                 
-                confidence = validation_result.get('confidence', 100)
+                # Simple confirmation without confidence percentage
                 await update.message.reply_text(
-                    f"✅ Screenshot ተረጋግጧል! ({confidence}% እምነት)"
+                    "✅ Screenshot ተረጋግጧል!"
                 )
             
             # Store AI result in session
