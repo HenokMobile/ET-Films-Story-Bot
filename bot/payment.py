@@ -1,8 +1,12 @@
 import sqlite3
 import logging
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 from config import ADMIN_USER_ID, USER_DB_PATH
+import google.generativeai as genai
+from PIL import Image
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +24,19 @@ MIN_DEPOSIT_CARD = 10
 class PaymentSystem:
     def __init__(self):
         self.payment_sessions = {}
+        # Initialize Gemini AI
+        try:
+            api_key = os.getenv('GEMINI_API_KEY')
+            if api_key:
+                genai.configure(api_key=api_key)
+                self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                logger.info("✅ Gemini AI initialized successfully")
+            else:
+                self.model = None
+                logger.warning("⚠️ GEMINI_API_KEY not found - AI validation disabled")
+        except Exception as e:
+            self.model = None
+            logger.error(f"❌ Gemini AI initialization error: {e}")
 
     def is_valid_phone(self, phone):
         """የስልክ ቁጥር ማረጋገጫ - ኢትዮቴሌኮም እና ሳፋሪኮም"""
@@ -252,8 +269,73 @@ class PaymentSystem:
             parse_mode='Markdown'
         )
 
+    async def validate_screenshot_with_ai(self, photo_bytes: bytes, session: dict) -> dict:
+        """Validate screenshot using Gemini AI"""
+        if not self.model:
+            return {'valid': True, 'message': 'AI validation disabled'}
+        
+        try:
+            # Load image
+            image = Image.open(io.BytesIO(photo_bytes))
+            
+            # Create validation prompt
+            method = session.get('method', 'Unknown')
+            amount = session.get('amount', 0)
+            name = session.get('name', '')
+            phone = session.get('phone', '')
+            account = session.get('account', '')
+            
+            prompt = f"""በዚህ screenshot ላይ የሚከተሉትን ያረጋግጡ:
+
+1. ይህ እውነተኛ የክፍያ screenshot ነው? (የተሰረዘ፣ የተቀየረ አይደለም?)
+2. የክፍያ ዘዴው {method} ነው?
+3. የገንዘብ መጠኑ {amount} ብር ነው?
+4. የተላከለት ስም {name} ነው?
+"""
+            
+            if phone:
+                prompt += f"5. ስልክ ቁጥሩ {phone} ነው?\n"
+            if account:
+                prompt += f"5. Account ቁጥሩ {account} ነው?\n"
+            
+            prompt += """
+እባክዎ በJSON format መልስ ይስጡ:
+{
+    "is_genuine": true/false,
+    "is_payment_app": true/false,
+    "payment_method_match": true/false,
+    "amount_match": true/false,
+    "amount_found": "ከscreenshot የተገኘው መጠን",
+    "recipient_match": true/false,
+    "confidence": 0-100,
+    "issues": ["ምን ችግር አለ?"],
+    "recommendation": "approve/reject/manual_review"
+}
+"""
+            
+            # Send to Gemini
+            response = self.model.generate_content([prompt, image])
+            result_text = response.text
+            
+            # Parse JSON response
+            import json
+            # Extract JSON from markdown code blocks if present
+            if '```json' in result_text:
+                result_text = result_text.split('```json')[1].split('```')[0].strip()
+            elif '```' in result_text:
+                result_text = result_text.split('```')[1].split('```')[0].strip()
+            
+            validation_result = json.loads(result_text)
+            
+            logger.info(f"AI Validation Result: {validation_result}")
+            return validation_result
+            
+        except Exception as e:
+            logger.error(f"AI validation error: {e}")
+            return {'valid': True, 'message': f'AI validation error: {str(e)}'}
+    
     async def process_screenshot(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Screenshot አፈጻጸም - 1 photo ብቻ"""
+        """Screenshot አፈጻጸም - AI validation ጋር"""
         user_id = update.effective_user.id
         session = self.payment_sessions.get(user_id)
 
@@ -266,11 +348,59 @@ class PaymentSystem:
             )
             return
 
-        # photo file ID ማስቀመጥ (1 photo ብቻ)
-        session['photo_file_id'] = update.message.photo[-1].file_id
+        # photo file ID ማስቀመጥ
+        photo = update.message.photo[-1]
+        session['photo_file_id'] = photo.file_id
+        
+        # Download photo for AI validation
+        try:
+            validation_msg = await update.message.reply_text("🔍 Screenshot እያረጋገጥኩ ነው...")
+            
+            photo_file = await context.bot.get_file(photo.file_id)
+            photo_bytes = await photo_file.download_as_bytearray()
+            
+            # Validate with AI
+            validation_result = await self.validate_screenshot_with_ai(bytes(photo_bytes), session)
+            
+            # Delete validation message
+            await validation_msg.delete()
+            
+            # Check validation result
+            if validation_result.get('recommendation') == 'reject':
+                issues = validation_result.get('issues', ['Screenshot ትክክል አይደለም'])
+                await update.message.reply_text(
+                    f"❌ Screenshot ተቀባይነት አላገኘም!\n\n"
+                    f"ችግሮች:\n" + "\n".join([f"• {issue}" for issue in issues]) + 
+                    f"\n\nእባክዎ እውነተኛ የክፍያ screenshot ይላኩ።"
+                )
+                return
+            
+            elif validation_result.get('recommendation') == 'manual_review':
+                # Low confidence - add warning but proceed
+                session['ai_warning'] = validation_result.get('issues', [])
+                confidence = validation_result.get('confidence', 0)
+                await update.message.reply_text(
+                    f"⚠️ Screenshot በትክክል አልተረጋገጠም (confidence: {confidence}%)\n"
+                    f"Admin የማረጋገጥ ኃላፊነት አለበት።"
+                )
+            
+            else:
+                # Approved
+                confidence = validation_result.get('confidence', 100)
+                await update.message.reply_text(
+                    f"✅ Screenshot ተረጋግጧል! (confidence: {confidence}%)"
+                )
+            
+            # Store AI result in session
+            session['ai_validation'] = validation_result
+            
+        except Exception as e:
+            logger.error(f"Screenshot validation error: {e}")
+            await update.message.reply_text(
+                "⚠️ AI validation ስህተት ተፈጥሯል። Screenshot ይቀጥላል።"
+            )
+        
         session['step'] = 'confirm'
-
-        # ማረጋገጫ ማሳያ
         await self.show_confirmation(update, context)
 
     async def handle_back_in_screenshot(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -390,7 +520,24 @@ class PaymentSystem:
             if 'card_info' in session:
                 admin_text += f"💳 ካርድ: {session['card_info']}\n"
 
-            admin_text += f"💰 መጠን: {session['amount']} ብር\n🆔 Payment ID: {payment_id}"
+            admin_text += f"💰 መጠን: {session['amount']} ብር\n🆔 Payment ID: {payment_id}\n\n"
+            
+            # Add AI validation info
+            if 'ai_validation' in session:
+                ai_result = session['ai_validation']
+                recommendation = ai_result.get('recommendation', 'unknown')
+                confidence = ai_result.get('confidence', 0)
+                
+                if recommendation == 'approve':
+                    admin_text += f"🤖 AI: ✅ ተቀባይነት አግኝቷል ({confidence}%)\n"
+                elif recommendation == 'reject':
+                    admin_text += f"🤖 AI: ❌ ውድቅ ({confidence}%)\n"
+                    issues = ai_result.get('issues', [])
+                    admin_text += "⚠️ ችግሮች:\n" + "\n".join([f"  • {issue}" for issue in issues]) + "\n"
+                else:
+                    admin_text += f"🤖 AI: ⚠️ Manual Review ({confidence}%)\n"
+                    if 'ai_warning' in session:
+                        admin_text += "⚠️ ማስጠንቀቂያዎች:\n" + "\n".join([f"  • {w}" for w in session['ai_warning']]) + "\n"
 
             # የAdmin ማጽደቂያ keyboard መፍጠር
             keyboard = [
