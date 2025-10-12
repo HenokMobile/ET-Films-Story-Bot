@@ -279,28 +279,29 @@ class PaymentSystem:
             # Load image
             image = Image.open(io.BytesIO(photo_bytes))
             
-            # Create validation prompt
+            # Create validation prompt - fully in Amharic
             method = session.get('method', 'Unknown')
             amount = session.get('amount', 0)
             name = session.get('name', '')
             phone = session.get('phone', '')
             account = session.get('account', '')
             
-            prompt = f"""በዚህ screenshot ላይ የሚከተሉትን ያረጋግጡ:
+            prompt = f"""በዚህ screenshot ላይ የሚከተሉትን በአማርኛ ያረጋግጡ:
 
-1. ይህ እውነተኛ የክፍያ screenshot ነው? (የተሰረዘ፣ የተቀየረ አይደለም?)
-2. የክፍያ ዘዴው {method} ነው?
-3. የገንዘብ መጠኑ {amount} ብር ነው?
-4. የተላከለት ስም {name} ነው?
+1. ይህ እውነተኛ የክፍያ screenshot ነው? (የተሰረዘ፣ የተቀየረ፣ የጽሁፍ ብቻ አይደለም?)
+2. የክፍያ መተግበሪያ ወይም SMS screenshot ነው? (Telebirr, CBEbirr, CBE, Ethiotelecom)
+3. የክፍያ ዘዴው {method} ጋር ይዛመዳል?
+4. የገንዘብ መጠኑ {amount} ብር ነው?
+5. የተላከለት ስም {name} ነው?
 """
             
             if phone:
-                prompt += f"5. ስልክ ቁጥሩ {phone} ነው?\n"
+                prompt += f"6. ስልክ ቁጥሩ {phone} ነው?\n"
             if account:
-                prompt += f"5. Account ቁጥሩ {account} ነው?\n"
+                prompt += f"6. Account ቁጥሩ {account} ነው?\n"
             
             prompt += """
-እባክዎ በJSON format መልስ ይስጡ:
+እባክዎ በJSON format መልስ ይስጡ (ችግሮች በአማርኛ ብቻ):
 {
     "is_genuine": true/false,
     "is_payment_app": true/false,
@@ -309,7 +310,7 @@ class PaymentSystem:
     "amount_found": "ከscreenshot የተገኘው መጠን",
     "recipient_match": true/false,
     "confidence": 0-100,
-    "issues": ["ምን ችግር አለ?"],
+    "issues": ["ችግሮች በአማርኛ ብቻ - ለምሳሌ: 'Screenshot የተቀየረ ይመስላል', 'የገንዘብ መጠን አይዛመድም', 'የክፍያ መተግበሪያ አይደለም'"],
     "recommendation": "approve/reject/manual_review"
 }
 """
@@ -346,6 +347,14 @@ class PaymentSystem:
         if not update.message.photo:
             await update.message.reply_text(
                 "❌ እባክዎ የክፍያ 📸Screenshot (Photo) ያላኩ!"
+            )
+            return
+
+        # Check if photo has caption (text) - reject if it does
+        if update.message.caption:
+            await update.message.reply_text(
+                "❌ የጽሁፍ ያለው Photo መላክ አይቻልም!\n\n"
+                "📸 የክፍያ Screenshot (Photo) ብቻ - ጽሁፍ ሳይኖረው ይላኩ!"
             )
             return
 
@@ -447,7 +456,7 @@ class PaymentSystem:
                 session['ai_warning'] = validation_result.get('issues', [])
                 confidence = validation_result.get('confidence', 0)
                 await update.message.reply_text(
-                    f"⚠️ Screenshot በትክክል አልተረጋገጠም (confidence: {confidence}%)\n"
+                    f"⚠️ Screenshot በትክክል አልተረጋገጠም ({confidence}% እምነት)\n"
                     f"Admin የማረጋገጥ ኃላፊነት አለበት።"
                 )
             
@@ -458,7 +467,7 @@ class PaymentSystem:
                 
                 confidence = validation_result.get('confidence', 100)
                 await update.message.reply_text(
-                    f"✅ Screenshot ተረጋግጧል! (confidence: {confidence}%)"
+                    f"✅ Screenshot ተረጋግጧል! ({confidence}% እምነት)"
                 )
             
             # Store AI result in session
