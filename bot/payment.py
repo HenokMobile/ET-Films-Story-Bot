@@ -500,13 +500,19 @@ class PaymentSystem:
                     return
             
             elif validation_result.get('recommendation') == 'manual_review':
-                # Low confidence - add warning but proceed
+                # Store warning for admin but don't show to user if confidence is high
                 session['ai_warning'] = validation_result.get('issues', [])
                 confidence = validation_result.get('confidence', 0)
-                await update.message.reply_text(
-                    f"⚠️ Screenshot በትክክል አልተረጋገጠም ({confidence}% እምነት)\n"
-                    f"Admin የማረጋገጥ ኃላፊነት አለበት።"
-                )
+                
+                # Only show warning to user if confidence is below 90%
+                if confidence < 90:
+                    await update.message.reply_text(
+                        f"⚠️ Screenshot በትክክል አልተረጋገጠም ({confidence}% እምነት)\n"
+                        f"Admin የማረጋገጥ ኃላፊነት አለበት።"
+                    )
+                else:
+                    # High confidence manual review - silent processing
+                    logger.info(f"High confidence manual review ({confidence}%) - silent processing")
             
             else:
                 # Approved - clear failed attempts
