@@ -1329,7 +1329,6 @@ async def main():
     """Start the bot"""
     import asyncio
     import signal
-    from aiohttp import web
 
     global CHANNEL_QUEUE
 
@@ -1351,37 +1350,38 @@ async def main():
     asyncio.create_task(channel_consumer())
     logger.info("🚀 Channel Consumer started - instant processing!")
 
-    # Bot status tracking for health check
-    bot_status = {'running': False, 'last_update': None}
-    
-    # Start health check server for UptimeRobot
-    async def health_check(request):
-        import time
-        current_time = time.time()
-        
-        # Check if bot received updates recently (within 5 minutes)
-        if bot_status['last_update']:
-            time_since_update = current_time - bot_status['last_update']
-            if time_since_update > 300:  # 5 minutes
-                return web.Response(text="STALE", status=503)
-        
-        status = "OK" if bot_status['running'] else "STARTING"
-        return web.Response(text=status, status=200)
-    
-    async def update_status(request):
-        bot_status['last_update'] = time.time()
-        return web.Response(text="Updated", status=200)
-
-    app = web.Application()
-    app.router.add_get('/', health_check)
-    app.router.add_get('/health', health_check)
-    app.router.add_post('/ping', update_status)
-    
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8080)
-    asyncio.create_task(site.start())
-    logger.info("🏥 Health check server started on port 8080")
+    # Health check server disabled
+    # # Bot status tracking for health check
+    # bot_status = {'running': False, 'last_update': None}
+    # 
+    # # Start health check server for UptimeRobot
+    # async def health_check(request):
+    #     import time
+    #     current_time = time.time()
+    #     
+    #     # Check if bot received updates recently (within 5 minutes)
+    #     if bot_status['last_update']:
+    #         time_since_update = current_time - bot_status['last_update']
+    #         if time_since_update > 300:  # 5 minutes
+    #             return web.Response(text="STALE", status=503)
+    #     
+    #     status = "OK" if bot_status['running'] else "STARTING"
+    #     return web.Response(text=status, status=200)
+    # 
+    # async def update_status(request):
+    #     bot_status['last_update'] = time.time()
+    #     return web.Response(text="Updated", status=200)
+    #
+    # app = web.Application()
+    # app.router.add_get('/', health_check)
+    # app.router.add_get('/health', health_check)
+    # app.router.add_post('/ping', update_status)
+    # 
+    # runner = web.AppRunner(app)
+    # await runner.setup()
+    # site = web.TCPSite(runner, '0.0.0.0', 8080)
+    # asyncio.create_task(site.start())
+    # logger.info("🏥 Health check server started on port 8080")
 
     # Create application with conflict resolution
     application = Application.builder().token(config.BOT_TOKEN).build()
