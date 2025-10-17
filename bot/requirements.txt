@@ -1,8 +1,0 @@
-
-
-aiohttp>=3.13.0
-aiosqlite>=0.21.0
-google-generativeai>=0.8.5
-pillow>=11.3.0
-python-dotenv>=1.1.1
-python-telegram-bot==21.10.0
