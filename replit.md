@@ -10,6 +10,19 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 2025)
 
+### Project Restructuring & Dependency Management (Oct 17, 2025)
+**Changes Made:**
+1. **Main Entry Point Moved**: Relocated `bot/run.py` → `main.py` (root directory) for cleaner project structure
+2. **Bot Package Structure**: Created `bot/__init__.py` to properly export main function from bot module
+3. **Python Path Configuration**: Added `sys.path` configuration in `main.py` to handle bot folder imports
+4. **Workflow Updated**: Changed from `python bot/run.py` to `python main.py`
+5. **Dependency Management**: Switched from `pyproject.toml` to `requirements.txt` for better GitHub compatibility
+   - Removed `pyproject.toml` and `uv.lock`
+   - Consolidated all dependencies in `requirements.txt` with pip==24.3.1
+6. **Console Logo**: Maintained the startup banner display in main.py
+
+**Rationale**: GitHub projects typically use `requirements.txt` for wider compatibility. Having main.py in root follows Python project conventions and makes deployment clearer.
+
 ### Major Channel Processing Overhaul (Oct 9, 2025)
 **Problem Solved:** Bot was unable to process 1000+ files uploaded simultaneously to channels. Files were being lost due to batch timer cancellation causing only the last batch to process, and serial processing bottleneck limited throughput.
 
