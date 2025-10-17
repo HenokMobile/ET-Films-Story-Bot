@@ -4,9 +4,6 @@ import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 from config import ADMIN_USER_ID, USER_DB_PATH
-import google.generativeai as genai
-from PIL import Image
-import io
 
 logger = logging.getLogger(__name__)
 
@@ -25,19 +22,6 @@ class PaymentSystem:
     def __init__(self):
         self.payment_sessions = {}
         self.screenshot_attempts = {}  # Track failed screenshot attempts per user
-        # Initialize Gemini AI
-        try:
-            api_key = os.getenv('GEMINI_API_KEY')
-            if api_key:
-                genai.configure(api_key=api_key)
-                self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
-                logger.info("✅ Gemini AI initialized successfully")
-            else:
-                self.model = None
-                logger.warning("⚠️ GEMINI_API_KEY not found - AI validation disabled")
-        except Exception as e:
-            self.model = None
-            logger.error(f"❌ Gemini AI initialization error: {e}")
 
     def is_valid_phone(self, phone):
         """የስልክ ቁጥር ማረጋገጫ - ኢትዮቴሌኮም እና ሳፋሪኮም"""
@@ -270,122 +254,8 @@ class PaymentSystem:
             parse_mode='Markdown'
         )
 
-    async def validate_screenshot_with_ai(self, photo_bytes: bytes, session: dict) -> dict:
-        """Validate screenshot using Gemini AI"""
-        if not self.model:
-            return {'valid': True, 'message': 'AI validation disabled'}
-        
-        try:
-            # Load image
-            image = Image.open(io.BytesIO(photo_bytes))
-            
-            # Create validation prompt - fully in Amharic
-            method = session.get('method', 'Unknown')
-            amount = session.get('amount', 0)
-            name = session.get('name', '')
-            phone = session.get('phone', '')
-            account = session.get('account', '')
-            
-            prompt = f"""በዚህ screenshot ላይ የሚከተሉትን በአማርኛ ያረጋግጡ:
-
-1. ይህ እውነተኛ የክፍያ screenshot ነው? (የተሰረዘ፣ የተቀየረ፣ የጽሁፍ ብቻ አይደለም?)
-2. የክፍያ መተግበሪያ ወይም SMS screenshot ነው? (Telebirr, CBEbirr, CBE, Ethiotelecom)
-3. የክፍያ ዘዴው {method} ጋር ይዛመዳል?
-4. የገንዘብ መጠኑ {amount} ብር ነው?
-5. የተላከለት ስም {name} ነው?
-"""
-            
-            if phone:
-                prompt += f"6. ስልክ ቁጥሩ {phone} ነው?\n"
-            if account:
-                prompt += f"6. Account ቁጥሩ {account} ነው?\n"
-            
-            prompt += """
-እባክዎ በJSON format መልስ ይስጡ (ችግሮች በአማርኛ ብቻ):
-{
-    "is_genuine": true/false,
-    "is_payment_app": true/false,
-    "payment_method_match": true/false,
-    "amount_match": true/false,
-    "amount_found": "ከscreenshot የተገኘው መጠን",
-    "recipient_match": true/false,
-    "confidence": 0-100,
-    "issues": ["ችግሮች በአማርኛ ብቻ - ለምሳሌ: 'Screenshot የተቀየረ ይመስላል', 'የገንዘብ መጠን አይዛመድም', 'የክፍያ መተግበሪያ አይደለም'"],
-    "recommendation": "approve/reject/manual_review"
-}
-"""
-            
-            # Send to Gemini with strict JSON response
-            response = self.model.generate_content(
-                [prompt, image],
-                generation_config={
-                    'temperature': 0.1,  # More consistent responses
-                    'response_mime_type': 'application/json'  # Force JSON output
-                }
-            )
-            result_text = response.text.strip()
-            
-            # Parse JSON response
-            import json
-            
-            # Extract JSON from markdown code blocks if present
-            if '```json' in result_text:
-                result_text = result_text.split('```json')[1].split('```')[0].strip()
-            elif '```' in result_text:
-                result_text = result_text.split('```')[1].split('```')[0].strip()
-            
-            # Parse JSON
-            validation_result = json.loads(result_text)
-            
-            # Handle array response - extract first item
-            if isinstance(validation_result, list):
-                if len(validation_result) > 0:
-                    validation_result = validation_result[0]
-                else:
-                    logger.error(f"AI returned empty array: {result_text}")
-                    return {
-                        'recommendation': 'manual_review',
-                        'confidence': 0,
-                        'issues': ['AI ባዶ መልስ መለሰ - በእጅ ይፈተሽ'],
-                        'is_genuine': False,
-                        'is_payment_app': False
-                    }
-            
-            # Validate required fields
-            if 'recommendation' not in validation_result or 'confidence' not in validation_result:
-                logger.error(f"AI response missing required fields: {result_text}")
-                return {
-                    'recommendation': 'manual_review',
-                    'confidence': 0,
-                    'issues': ['AI response ትክክል አልሆነም - በእጅ ይፈተሽ'],
-                    'is_genuine': False,
-                    'is_payment_app': False
-                }
-            
-            logger.info(f"✅ AI Validation Result: {validation_result}")
-            return validation_result
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ AI JSON parsing error: {e}\nResponse text: {result_text if 'result_text' in locals() else 'N/A'}")
-            return {
-                'recommendation': 'manual_review',
-                'confidence': 0,
-                'issues': ['AI response በትክክል አልተመለሰም - በእጅ ይፈተሽ'],
-                'is_genuine': False,
-                'is_payment_app': False
-            }
-        except Exception as e:
-            logger.error(f"❌ AI validation error: {e}")
-            return {
-                'recommendation': 'manual_review',
-                'confidence': 0,
-                'issues': [f'AI ስህተት: {str(e)}'],
-                'is_genuine': False,
-                'is_payment_app': False
-            }
-    
     async def process_screenshot(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Screenshot አፈጻጸም - AI validation ጋር እና 3x attempt limit"""
+        """Screenshot አፈጻጸም"""
         user_id = update.effective_user.id
         session = self.payment_sessions.get(user_id)
 
@@ -410,121 +280,10 @@ class PaymentSystem:
         photo = update.message.photo[-1]
         session['photo_file_id'] = photo.file_id
         
-        # Download photo for AI validation
-        try:
-            validation_msg = await update.message.reply_text("🔍 Screenshot እያረጋገጥኩ ነው...")
-            
-            photo_file = await context.bot.get_file(photo.file_id)
-            photo_bytes = await photo_file.download_as_bytearray()
-            
-            # Validate with AI
-            validation_result = await self.validate_screenshot_with_ai(bytes(photo_bytes), session)
-            
-            # Delete validation message
-            await validation_msg.delete()
-            
-            # Check validation result
-            if validation_result.get('recommendation') == 'reject':
-                # Track failed attempts
-                if user_id not in self.screenshot_attempts:
-                    self.screenshot_attempts[user_id] = 0
-                
-                self.screenshot_attempts[user_id] += 1
-                attempts_left = 3 - self.screenshot_attempts[user_id]
-                
-                issues = validation_result.get('issues', ['Screenshot ትክክል አይደለም'])
-                
-                if attempts_left > 0:
-                    await update.message.reply_text(
-                        f"❌ Screenshot ተቀባይነት አላገኘም!\n\n"
-                        f"ችግሮች:\n" + "\n".join([f"• {issue}" for issue in issues]) + 
-                        f"\n\n⚠️ የቀሩ እድሎች: {attempts_left}/3\n"
-                        f"እባክዎ እውነተኛ የክፍያ screenshot ይላኩ።"
-                    )
-                    return
-                else:
-                    # 3rd attempt failed - Block user for 24h
-                    from user_block import user_block_system
-                    from datetime import datetime, timedelta
-                    
-                    # Block user
-                    block_reason = f"3 ጊዜ የተሳሳተ Screenshot ላከ ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
-                    await user_block_system.block_user_temp(
-                        admin_id=ADMIN_USER_ID,
-                        user_id=user_id,
-                        reason=block_reason,
-                        duration_hours=24,
-                        context=context
-                    )
-                    
-                    # Import main keyboard
-                    from bot import get_main_keyboard
-                    
-                    # Notify user
-                    await update.message.reply_text(
-                        "🚫 የጊዜያዊ ገደብ መልእክት\n\n"
-                        "❌ 3 ጊዜ የተሳሳተ Screenshot ላኩ!\n\n"
-                        "⏰ ለ24 ሰአት ከአገልግሎት ተገድበዋል።\n\n"
-                        "📞 ለበለጠ መረጃ Admin ን ያነጋግሩ:\n"
-                        "👉 @Henok_Chat",
-                        reply_markup=get_main_keyboard()
-                    )
-                    
-                    # Get user info
-                    user_data = await context.bot.get_chat(user_id)
-                    username = user_data.username or 'N/A'
-                    first_name = user_data.first_name or 'Unknown'
-                    
-                    # Notify admin
-                    try:
-                        await context.bot.send_message(
-                            ADMIN_USER_ID,
-                            f"🚫 Auto-Block Alert\n\n"
-                            f"👤 User: {first_name}\n"
-                            f"🆔 ID: {user_id}\n"
-                            f"📝 Username: @{username}\n\n"
-                            f"❌ 3 ጊዜ የተሳሳተ Screenshot ላከ\n"
-                            f"⏰ Blocked for: 24 hours\n"
-                            f"📅 Block Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-                            f"Issues:\n" + "\n".join([f"• {issue}" for issue in issues])
-                        )
-                    except Exception as e:
-                        logger.error(f"Error notifying admin of auto-block: {e}")
-                    
-                    # Clear session
-                    if user_id in self.payment_sessions:
-                        del self.payment_sessions[user_id]
-                    if user_id in self.screenshot_attempts:
-                        del self.screenshot_attempts[user_id]
-                    
-                    return
-            
-            elif validation_result.get('recommendation') == 'manual_review':
-                # Store warning for admin only - NO user notification
-                session['ai_warning'] = validation_result.get('issues', [])
-                confidence = validation_result.get('confidence', 0)
-                
-                # Silent processing - Admin will see in payment notification
-                logger.info(f"Manual review required ({confidence}%) - silent processing, admin will review")
-            
-            else:
-                # Approved - clear failed attempts
-                if user_id in self.screenshot_attempts:
-                    del self.screenshot_attempts[user_id]
-                
-                # Simple confirmation without confidence percentage
-                await update.message.reply_text(
-                    "✅ Screenshot ተረጋግጧል!"
-                )
-            
-            # Store AI result in session
-            session['ai_validation'] = validation_result
-            
-        except Exception as e:
-            logger.error(f"Screenshot validation error: {e}")
-            await update.message.reply_text(
-                "⚠️ AI validation ስህተት ተፈጥሯል። Screenshot ይቀጥላል።"
-            )
+        # Screenshot ተቀባይነት አግኝቷል
+        await update.message.reply_text(
+            "✅ Screenshot ተልክዋል!"
+        )
         
         session['step'] = 'confirm'
         await self.show_confirmation(update, context)
@@ -646,24 +405,7 @@ class PaymentSystem:
             if 'card_info' in session:
                 admin_text += f"💳 ካርድ: {session['card_info']}\n"
 
-            admin_text += f"💰 መጠን: {session['amount']} ብር\n🆔 Payment ID: {payment_id}\n\n"
-            
-            # Add AI validation info
-            if 'ai_validation' in session:
-                ai_result = session['ai_validation']
-                recommendation = ai_result.get('recommendation', 'unknown')
-                confidence = ai_result.get('confidence', 0)
-                
-                if recommendation == 'approve':
-                    admin_text += f"🤖 AI: ✅ ተቀባይነት አግኝቷል ({confidence}%)\n"
-                elif recommendation == 'reject':
-                    admin_text += f"🤖 AI: ❌ ውድቅ ({confidence}%)\n"
-                    issues = ai_result.get('issues', [])
-                    admin_text += "⚠️ ችግሮች:\n" + "\n".join([f"  • {issue}" for issue in issues]) + "\n"
-                else:
-                    admin_text += f"🤖 AI: ⚠️ Manual Review ({confidence}%)\n"
-                    if 'ai_warning' in session:
-                        admin_text += "⚠️ ማስጠንቀቂያዎች:\n" + "\n".join([f"  • {w}" for w in session['ai_warning']]) + "\n"
+            admin_text += f"💰 መጠን: {session['amount']} ብር\n🆔 Payment ID: {payment_id}"
 
             # የAdmin ማጽደቂያ keyboard መፍጠር
             keyboard = [
