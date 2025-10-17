@@ -9,7 +9,7 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 # Admin settings
-ADMIN_USER_ID = 6918848131  # Replace with your user ID
+ADMIN_USER_ID = 7375859130  # Replace with your user ID
 
 # Channel IDs (to be set via admin panel)
 SINGLE_MOVIE_CHANNEL_IDS = [-1003169574565]
