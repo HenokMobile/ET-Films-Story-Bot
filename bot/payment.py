@@ -59,6 +59,32 @@ class PaymentSystem:
         if any(char.isdigit() for char in name):
             return False
         return True
+    
+    def get_rejection_count_24h(self, user_id: int) -> int:
+        """በ24 ሰአት ውስጥ የተከለከሉ payments ቁጥር መመለስ"""
+        from datetime import datetime, timedelta
+        
+        try:
+            with sqlite3.connect(USER_DB_PATH) as conn:
+                cursor = conn.cursor()
+                
+                # የ24 ሰአት በፊት timestamp ማስላት
+                time_24h_ago = (datetime.now() - timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
+                
+                # የተከለከሉ payments መቁጠር - በrejected_at ጊዜ መሰረት
+                cursor.execute('''
+                    SELECT COUNT(*) FROM payments 
+                    WHERE user_id = ? 
+                    AND status = 'rejected' 
+                    AND rejected_at >= ?
+                ''', (user_id, time_24h_ago))
+                
+                count = cursor.fetchone()[0]
+                return count
+                
+        except Exception as e:
+            logger.error(f"Error counting rejections: {e}")
+            return 0
 
     def create_payment_keyboard(self):
         """የክፍያ ዘዴ ምረጃ keyboard"""
@@ -499,24 +525,118 @@ class PaymentSystem:
                 logger.error(f"Error editing admin message: {e}")
 
         elif action == "reject":
-            # የክፍያ ሁኔታ ማሻሻል
-            cursor.execute('UPDATE payments SET status = ? WHERE id = ?', ('rejected', payment_id))
+            # የክፍያ ሁኔታ ማሻሻል እና rejection timestamp መቅረጽ
+            from datetime import datetime
+            rejected_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            cursor.execute('''
+                UPDATE payments 
+                SET status = ?, rejected_at = ? 
+                WHERE id = ?
+            ''', ('rejected', rejected_timestamp, payment_id))
             conn.commit()
             conn.close()
+            
+            # የ24 ሰአት ውስጥ rejections መቁጠር (ከዚህ rejection በኋላ)
+            rejection_count = self.get_rejection_count_24h(user_id)
+            
+            # User notification message እና auto-block logic
+            user_message = ""
+            admin_message_suffix = ""
+            
+            if rejection_count == 1:
+                # 1st rejection - Warning
+                user_message = (
+                    "❌ የክፍያ ጥያቄዎ ውድቅ ሆኗል።\n\n"
+                    "⚠️ ማስጠንቀቂያ: በ24 ሰአት ውስጥ የመጀመሪያ ውድቅነት\n"
+                    "እባክዎ ትክክለኛ የክፍያ screenshot ያስገቡ።\n\n"
+                    "📩 ጥያቄ ካለዎት Admin ያነጋግሩ: @Henok_Chat"
+                )
+                admin_message_suffix = "\n⚠️ 1st rejection (24h)"
+                
+            elif rejection_count == 2:
+                # 2nd rejection - Final warning
+                user_message = (
+                    "❌ የክፍያ ጥያቄዎ ውድቅ ሆኗል።\n\n"
+                    "🚨 የመጨረሻ ማስጠንቀቂያ!\n"
+                    "በ24 ሰአት ውስጥ 2ኛ ውድቅነት\n\n"
+                    "⚠️ አንድ ተጨማሪ ውድቅነት = ለ24 ሰአት መገደብ\n"
+                    "እባክዎ በጥንቃቄ እና ትክክለኛ መረጃ ብቻ ያስገቡ።\n\n"
+                    "📩 ለእርዳታ: @Henok_Chat"
+                )
+                admin_message_suffix = "\n🚨 2nd rejection (24h) - Final warning"
+                
+            elif rejection_count >= 3:
+                # 3rd+ rejection - Auto-block for 24h
+                from user_block import user_block_system
+                from datetime import datetime
+                
+                block_reason = f"3+ payment rejections በ24 ሰአት ውስጥ ({datetime.now().strftime('%Y-%m-%d %H:%M')})"
+                
+                # Block user for 24 hours
+                success, msg = await user_block_system.block_user_temp(
+                    admin_id=ADMIN_USER_ID,
+                    user_id=user_id,
+                    reason=block_reason,
+                    duration_hours=24,
+                    context=context
+                )
+                
+                if success:
+                    user_message = (
+                        "🚫 የጊዜያዊ ገደብ መልእክት\n\n"
+                        "❌ በ24 ሰአት ውስጥ 3 ጊዜ የተሳሳተ የክፍያ መረጃ አስገብተዋል!\n\n"
+                        f"⏰ ለ24 ሰአት ከአገልግሎት ተገድበዋል።\n"
+                        f"📅 የመገደብ ጊዜ: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+                        "📞 ለበለጠ መረጃ Admin ን ያነጋግሩ:\n"
+                        "👉 @Henok_Chat"
+                    )
+                    admin_message_suffix = f"\n🚫 AUTO-BLOCKED (24h) - 3+ rejections\n✅ {msg}"
+                    
+                    # Get user info for admin notification
+                    try:
+                        user_data = await context.bot.get_chat(user_id)
+                        username = user_data.username or 'N/A'
+                        first_name = user_data.first_name or 'Unknown'
+                        
+                        # Notify admin about auto-block
+                        await context.bot.send_message(
+                            ADMIN_USER_ID,
+                            f"🚫 Auto-Block Alert\n\n"
+                            f"👤 User: {first_name}\n"
+                            f"🆔 ID: {user_id}\n"
+                            f"📝 Username: @{username}\n\n"
+                            f"❌ 3+ የክፍያ rejections በ24 ሰአት ውስጥ\n"
+                            f"⏰ Blocked for: 24 hours\n"
+                            f"📅 Block Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                        )
+                    except Exception as e:
+                        logger.error(f"Error notifying admin of auto-block: {e}")
+                else:
+                    user_message = (
+                        "❌ የክፍያ ጥያቄዎ ውድቅ ሆኗል።\n\n"
+                        "🚨 በ24 ሰአት ውስጥ 3+ ውድቅነቶች!\n"
+                        "እባክዎ Admin ን ያነጋግሩ: @Henok_Chat"
+                    )
+                    admin_message_suffix = "\n❌ Auto-block failed"
+            else:
+                # Default rejection message
+                user_message = "❌ የክፍያ ጥያቄዎ ውድቅ ሆኗል። እባክዎ እንደገና ይሞክሩ ወይም አድሚንን ያነጋግሩ። 📩 @Henok_Chat ☑️"
 
+            # Send user notification
             try:
-                await context.bot.send_message(user_id, "❌ የክፍያ ጥያቄዎ ውድቅ ሆኗል። እባክዎ እንደገና ይሞክሩ ወይም አድሚንን ያነጋግሩ። 📩 @Henok_Chat ☑️")
+                await context.bot.send_message(user_id, user_message)
             except:
                 pass
 
             # Admin message ማሻሻል
             try:
+                admin_caption = f"❌ ክፍያ ውድቅ ሆኗል!\nተጠቃሚ: {user_id}\nመጠን: {amount} ብር{admin_message_suffix}"
+                
                 if query.message.photo:
-                    await query.edit_message_caption(
-                        caption=f"❌ ክፍያ ውድቅ ሆኗል!\nተጠቃሚ: {user_id}\nመጠን: {amount} ብር"
-                    )
+                    await query.edit_message_caption(caption=admin_caption)
                 else:
-                    await query.edit_message_text(f"❌ ክፍያ ውድቅ ሆኗል!\nተጠቃሚ: {user_id}\nመጠን: {amount} ብር")
+                    await query.edit_message_text(admin_caption)
             except Exception as e:
                 logger.error(f"Error editing admin message: {e}")
 

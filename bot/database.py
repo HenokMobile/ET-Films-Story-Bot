@@ -66,17 +66,27 @@ class DatabaseManager:
                     amount INTEGER NOT NULL,
                     photo_file_id TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    status TEXT DEFAULT 'pending'
+                    status TEXT DEFAULT 'pending',
+                    rejected_at TIMESTAMP
                 )
             ''')
+            
+            # Add rejected_at column if it doesn't exist (for existing databases)
+            try:
+                conn.execute('ALTER TABLE payments ADD COLUMN rejected_at TIMESTAMP')
+            except sqlite3.OperationalError:
+                pass  # Column already exists
 
             # Migration: Convert existing TEXT user_id to INTEGER if needed
             try:
-                # Check if there's data with TEXT user_id that needs migration
+                # Check if user_id is TEXT type (needs migration)
                 cursor = conn.cursor()
-                cursor.execute("SELECT name FROM pragma_table_info('payments') WHERE name='user_id'")
-                if cursor.fetchone():
-                    # Create new table with correct schema
+                cursor.execute("SELECT type FROM pragma_table_info('payments') WHERE name='user_id'")
+                user_id_type = cursor.fetchone()
+                
+                # Only migrate if user_id is TEXT (not INTEGER)
+                if user_id_type and user_id_type[0] == 'TEXT':
+                    # Create new table with correct schema (including rejected_at)
                     conn.execute('''
                         CREATE TABLE IF NOT EXISTS payments_new (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,21 +98,34 @@ class DatabaseManager:
                             amount INTEGER NOT NULL,
                             photo_file_id TEXT,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            status TEXT DEFAULT 'pending'
+                            status TEXT DEFAULT 'pending',
+                            rejected_at TIMESTAMP
                         )
                     ''')
 
-                    # Copy data, converting user_id to INTEGER
-                    conn.execute('''
-                        INSERT OR IGNORE INTO payments_new 
-                        SELECT id, CAST(user_id AS INTEGER), method, name, phone, account, amount, photo_file_id, created_at, status
-                        FROM payments
-                    ''')
+                    # Check if rejected_at column exists in old table
+                    cursor.execute("SELECT name FROM pragma_table_info('payments') WHERE name='rejected_at'")
+                    has_rejected_at = cursor.fetchone() is not None
+                    
+                    # Copy data, converting user_id to INTEGER and preserving rejected_at if it exists
+                    if has_rejected_at:
+                        conn.execute('''
+                            INSERT OR IGNORE INTO payments_new 
+                            SELECT id, CAST(user_id AS INTEGER), method, name, phone, account, amount, photo_file_id, created_at, status, rejected_at
+                            FROM payments
+                        ''')
+                    else:
+                        conn.execute('''
+                            INSERT OR IGNORE INTO payments_new 
+                            SELECT id, CAST(user_id AS INTEGER), method, name, phone, account, amount, photo_file_id, created_at, status, NULL
+                            FROM payments
+                        ''')
 
                     # Drop old table and rename new one
                     conn.execute('DROP TABLE IF EXISTS payments')
                     conn.execute('ALTER TABLE payments_new RENAME TO payments')
-            except:
+            except Exception as e:
+                logger.error(f"Migration error: {e}")
                 pass  # Migration not needed or already done
 
         # Single movies database
