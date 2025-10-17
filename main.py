@@ -3,6 +3,10 @@ import asyncio
 import logging
 import sys
 import signal
+import os
+
+# Add bot directory to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'bot'))
 
 # Configure logging
 logging.basicConfig(
