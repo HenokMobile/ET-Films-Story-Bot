@@ -644,10 +644,9 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
                     # Deduct balance
                     import sqlite3
-                    conn = sqlite3.connect(config.USER_DB_PATH)
-                    conn.execute('UPDATE users SET balance = balance - ? WHERE user_id = ?', (PRICE, user_id))
-                    conn.commit()
-                    conn.close()
+                    with sqlite3.connect(config.USER_DB_PATH) as conn:
+                        conn.execute('UPDATE users SET balance = balance - ? WHERE user_id = ?', (PRICE, user_id))
+                        conn.commit()
 
                     # Delete the inline keyboard message
                     try:
@@ -867,10 +866,9 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
                     # Deduct balance
                     import sqlite3
-                    conn = sqlite3.connect(config.USER_DB_PATH)
-                    conn.execute('UPDATE users SET balance = balance - ? WHERE user_id = ?', (MOVIE_PRICE, user_id))
-                    conn.commit()
-                    conn.close()
+                    with sqlite3.connect(config.USER_DB_PATH) as conn:
+                        conn.execute('UPDATE users SET balance = balance - ? WHERE user_id = ?', (MOVIE_PRICE, user_id))
+                        conn.commit()
 
                     new_balance = user_balance - MOVIE_PRICE
 
@@ -949,10 +947,9 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
                     # Deduct balance
                     import sqlite3
-                    conn = sqlite3.connect(config.USER_DB_PATH)
-                    conn.execute('UPDATE users SET balance = balance - ? WHERE user_id = ?', (SERIES_PRICE, user_id))
-                    conn.commit()
-                    conn.close()
+                    with sqlite3.connect(config.USER_DB_PATH) as conn:
+                        conn.execute('UPDATE users SET balance = balance - ? WHERE user_id = ?', (SERIES_PRICE, user_id))
+                        conn.commit()
 
                     new_balance = user_balance - SERIES_PRICE
 

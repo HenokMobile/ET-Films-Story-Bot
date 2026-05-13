@@ -400,11 +400,10 @@ class PaymentSystem:
             user_data = await context.bot.get_chat(user_id)
             
             # Get user's registered phone from database
-            conn = sqlite3.connect(USER_DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('SELECT username, phone_number FROM users WHERE user_id = ?', (user_id,))
-            user_info = cursor.fetchone()
-            conn.close()
+            with sqlite3.connect(USER_DB_PATH) as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT username, phone_number FROM users WHERE user_id = ?', (user_id,))
+                user_info = cursor.fetchone()
             
             username = user_info[0] if user_info and user_info[0] else 'N/A'
             registered_phone = user_info[1] if user_info and user_info[1] else 'N/A'
@@ -468,48 +467,51 @@ class PaymentSystem:
         action = data_parts[0]  # approve or reject
         payment_id = data_parts[2]
 
-        conn = sqlite3.connect(USER_DB_PATH)
-        cursor = conn.cursor()
+        payment = None
+        payment_id_orig = payment_id
+        with sqlite3.connect(USER_DB_PATH) as conn:
+            cursor = conn.cursor()
 
-        # የክፍያ ዝርዝሮች ማግኘት - Select specific columns
-        cursor.execute('''
-            SELECT id, user_id, method, name, phone, account, amount, photo_file_id, created_at, status 
-            FROM payments WHERE id = ?
-        ''', (payment_id,))
-        payment = cursor.fetchone()
+            cursor.execute('''
+                SELECT id, user_id, method, name, phone, account, amount, photo_file_id, created_at, status 
+                FROM payments WHERE id = ?
+            ''', (payment_id,))
+            payment = cursor.fetchone()
 
-        if not payment:
-            await query.edit_message_text("❌ ክፍያ አልተገኘም!")
-            conn.close()
-            return
+            if not payment:
+                await query.edit_message_text("❌ ክፍያ አልተገኘም!")
+                return
 
-        # Unpack with correct indices
-        payment_id, user_id, method, name, phone, account, amount, photo_file_id, created_at, status = payment
-        
-        # Validate amount
-        try:
-            amount = int(amount)
-        except (ValueError, TypeError):
-            logger.error(f"Invalid amount in payment {payment_id}: {amount}")
-            await query.edit_message_text("❌ የክፍያ መጠን ስህተት አለበት!")
-            conn.close()
-            return
+            payment_id, user_id, method, name, phone, account, amount, photo_file_id, created_at, status = payment
+
+            try:
+                amount = int(amount)
+            except (ValueError, TypeError):
+                logger.error(f"Invalid amount in payment {payment_id}: {amount}")
+                await query.edit_message_text("❌ የክፍያ መጠን ስህተት አለበት!")
+                return
+
+            if action == "approve":
+                cursor.execute('UPDATE payments SET status = ? WHERE id = ?', ('approved', payment_id))
+                cursor.execute('UPDATE users SET balance = COALESCE(balance, 0) + ? WHERE user_id = ?', (amount, user_id))
+                conn.commit()
+
+            elif action == "reject":
+                from datetime import datetime
+                rejected_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                cursor.execute('''
+                    UPDATE payments 
+                    SET status = ?, rejected_at = ? 
+                    WHERE id = ?
+                ''', ('rejected', rejected_timestamp, payment_id))
+                conn.commit()
 
         if action == "approve":
-            # የክፍያ ሁኔታ ማሻሻል
-            cursor.execute('UPDATE payments SET status = ? WHERE id = ?', ('approved', payment_id))
-
-            # ለተጠቃሚ ባለንስ መጨመር - ensure balance is never NULL
-            cursor.execute('UPDATE users SET balance = COALESCE(balance, 0) + ? WHERE user_id = ?', (amount, user_id))
-            conn.commit()
-            conn.close()
-
             try:
                 await context.bot.send_message(user_id, f"✅ የክፍያ ጥያቄዎ ተቀባይነት አግኝቷል!\n💰 {amount} ብር ወደ ሂሳብዎ ተጨምሯል።")
             except:
                 pass
 
-            # Admin message ማሻሻል
             try:
                 if query.message.photo:
                     await query.edit_message_caption(
@@ -521,17 +523,6 @@ class PaymentSystem:
                 logger.error(f"Error editing admin message: {e}")
 
         elif action == "reject":
-            # የክፍያ ሁኔታ ማሻሻል እና rejection timestamp መቅረጽ
-            from datetime import datetime
-            rejected_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
-            cursor.execute('''
-                UPDATE payments 
-                SET status = ?, rejected_at = ? 
-                WHERE id = ?
-            ''', ('rejected', rejected_timestamp, payment_id))
-            conn.commit()
-            conn.close()
             
             # የ24 ሰአት ውስጥ rejections መቁጠር (ከዚህ rejection በኋላ)
             rejection_count = self.get_rejection_count_24h(user_id)
