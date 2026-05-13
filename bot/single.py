@@ -256,24 +256,19 @@ async def handle_movie_channel_post(message, channel_id):
 
         # ⚡ QUICK PRE-CHECK (< 0.1s) - 100% exact match by name only
         if file_data['file_size'] > 0:
-            import sqlite3
-            with sqlite3.connect(config.SINGLE_DB_PATH) as conn:
-                cursor = conn.cursor()
-                
-                # Quick name-only check for instant blocking
-                cursor.execute('''
+            import aiosqlite
+            async with aiosqlite.connect(config.SINGLE_DB_PATH) as conn:
+                cursor = await conn.execute('''
                     SELECT id, file_size FROM single_movies 
                     WHERE file_name = ? LIMIT 1
                 ''', (file_data['file_name'],))
-                
-                existing = cursor.fetchone()
-                
+                existing = await cursor.fetchone()
+
                 if existing and existing[1] == file_data['file_size']:
                     # 100% exact match - INSTANT DELETE
                     try:
-                        from telegram import Bot
-                        bot = Bot(token=config.BOT_TOKEN)
-                        await bot.delete_message(
+                        from background_worker import background_worker
+                        await background_worker.bot.delete_message(
                             chat_id=channel_id,
                             message_id=message.message_id
                         )

@@ -16,8 +16,11 @@ class AdminPanel:
         """Update config file with new value"""
         try:
             import re
+            import os
 
-            with open('config.py', 'r', encoding='utf-8') as f:
+            config_path = os.path.join(os.path.dirname(__file__), 'config.py')
+
+            with open(config_path, 'r', encoding='utf-8') as f:
                 content = f.read()
 
             # Update the specific line with proper formatting
@@ -28,11 +31,11 @@ class AdminPanel:
             updated_content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
 
             # If the key wasn't found, it means it doesn't exist, so we add it
-            if key not in content: # Corrected check to look for key directly
+            if key not in content:
                 updated_content += f'\n{key} = {repr(value)}\n'
 
             # Write back to file
-            with open('config.py', 'w', encoding='utf-8') as f:
+            with open(config_path, 'w', encoding='utf-8') as f:
                 f.write(updated_content)
 
             logger.info(f"Updated config file: {key} = {value}")
@@ -70,13 +73,6 @@ class AdminPanel:
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
-
-    async def handle_admin_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle admin panel callbacks"""
-        query = update.callback_query
-        await query.answer()
-
-
 
     def get_duplicate_stats_from_logs(self):
         """Extract duplicate statistics from log files"""
@@ -233,9 +229,6 @@ class AdminPanel:
             await self.show_series_statistics(query, context)
         elif data == "admin_settings":
             await self.show_bot_settings(query, context)
-        elif data == "admin_finance":
-            from admin_balance import admin_balance
-            await admin_balance.show_finance_dashboard(query, context)
         elif data.startswith("confirm_single_delete_"):
             channel_id = data.replace("confirm_single_delete_", "")
             await self.execute_single_db_cleanup(query, context, channel_id)

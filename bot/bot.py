@@ -217,9 +217,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_time = time.time()
     if current_time - context.user_data.get('last_cleanup', 0) > 3600:  # Every hour
         # Clear old search results
-        for key in ['last_movie_results', 'last_series_results']:
+        for key in ['last_movie_results', 'last_series_results', 'last_all_results',
+                    'movie_search_query', 'series_search_query', 'all_search_query']:
             if key in context.user_data:
                 del context.user_data[key]
+        # Clear stale user state to prevent memory leak
+        USER_STATES.pop(user.id, None)
         context.user_data['last_cleanup'] = current_time
 
     # Check if user is registered

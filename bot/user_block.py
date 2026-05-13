@@ -235,14 +235,37 @@ class UserBlockSystem:
             return False, f"❌ Error: {str(e)}"
     
     def is_user_blocked(self, user_id: int) -> bool:
-        """Check if user is blocked"""
+        """Check if user is blocked - also auto-unblocks if time has expired"""
         try:
             with sqlite3.connect(config.USER_DB_PATH) as conn:
                 cursor = conn.execute('''
-                    SELECT id FROM blocked_users 
+                    SELECT id, unblock_date FROM blocked_users 
                     WHERE user_id = ? AND status = 'blocked'
                 ''', (user_id,))
-                return cursor.fetchone() is not None
+                result = cursor.fetchone()
+                if result is None:
+                    return False
+
+                unblock_date = result[1]
+                if unblock_date:
+                    try:
+                        unblock_dt = datetime.strptime(unblock_date, '%Y-%m-%d %H:%M:%S')
+                        if datetime.now() >= unblock_dt:
+                            conn.execute('''
+                                UPDATE blocked_users 
+                                SET status = 'unblocked', unblocked_date = CURRENT_TIMESTAMP
+                                WHERE user_id = ? AND status = 'blocked'
+                            ''', (user_id,))
+                            conn.execute('''
+                                UPDATE users SET is_blocked = 0 WHERE user_id = ?
+                            ''', (user_id,))
+                            conn.commit()
+                            logger.info(f"✅ Auto-unblocked user {user_id} - block period expired")
+                            return False
+                    except ValueError:
+                        pass
+
+                return True
         except Exception as e:
             logger.error(f"Error checking block status: {e}")
             return False

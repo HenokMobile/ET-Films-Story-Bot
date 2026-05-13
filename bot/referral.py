@@ -60,9 +60,6 @@ class ReferralSystem:
         try:
             # Get bot info to get username
             bot_info = await context.bot.get_me()
-            logger.info(f"DEBUG: Bot info = {bot_info}")
-            logger.info(f"DEBUG: Bot username = {bot_info.username if bot_info else 'bot_info is None'}")
-            
             bot_username = bot_info.username if bot_info else None
             
             # Validate bot username

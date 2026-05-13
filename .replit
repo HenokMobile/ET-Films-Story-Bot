@@ -23,18 +23,6 @@ stack = "BEST_EFFORT_FALLBACK"
 runButton = "Project"
 
 [[workflows.workflow]]
-name = "Run"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python main.py"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
 name = "Project"
 mode = "parallel"
 author = "agent"
@@ -42,10 +30,6 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "ET Films Bot"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Run"
 
 [[workflows.workflow]]
 name = "ET Films Bot"

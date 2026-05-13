@@ -367,26 +367,22 @@ class PaymentSystem:
             return
 
         # የክፍያ ጥያቄ ወደ database ማስቀመጥ
-        conn = sqlite3.connect(USER_DB_PATH)
-        cursor = conn.cursor()
-
-        # የክፍያ ጥያቄ ማስገባት
-        cursor.execute('''
-            INSERT INTO payments (user_id, method, name, phone, account, amount, photo_file_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            user_id,
-            session['method'],
-            session.get('name'),
-            session.get('phone'),
-            session.get('account'),
-            session['amount'],
-            session.get('photo_file_id')
-        ))
-
-        payment_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(USER_DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO payments (user_id, method, name, phone, account, amount, photo_file_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                user_id,
+                session['method'],
+                session.get('name'),
+                session.get('phone'),
+                session.get('account'),
+                session['amount'],
+                session.get('photo_file_id')
+            ))
+            payment_id = cursor.lastrowid
+            conn.commit()
 
         # Import main keyboard
         from bot import get_main_keyboard
