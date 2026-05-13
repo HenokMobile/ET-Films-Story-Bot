@@ -7,6 +7,7 @@ ET Films Story Bot is a Telegram bot for managing and distributing Ethiopian fil
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Communication language: Always respond in Amharic (አማርኛ) only when talking to the user.
 
 ## Recent Changes (October 2025)
 
