@@ -102,87 +102,56 @@ async def get_films(request):
     if not user:
         raise web.HTTPUnauthorized()
 
-    film_type = request.query.get("type", "all")
     query = request.query.get("q", "").strip()
-    page = max(1, int(request.query.get("page", 1)))
+    page  = max(1, int(request.query.get("page", 1)))
     limit = 20
+    cap   = 5000
+
+    all_films = []
+
+    db_configs = [
+        (SINGLE_DB, "single_movies", "single"),
+        (SERIES_DB, "series",        "series"),
+    ]
+
+    for db_path, table, ftype in db_configs:
+        try:
+            with sqlite3.connect(db_path) as conn:
+                if query:
+                    rows = conn.execute(
+                        f"""SELECT id, file_id, message_id, file_name, file_title,
+                                   channel_id, file_size
+                            FROM {table}
+                            WHERE file_name LIKE ? OR file_title LIKE ?
+                            LIMIT ?""",
+                        (f"%{query}%", f"%{query}%", cap),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        f"""SELECT id, file_id, message_id, file_name, file_title,
+                                   channel_id, file_size
+                            FROM {table}
+                            LIMIT ?""",
+                        (cap,),
+                    ).fetchall()
+            for r in rows:
+                all_films.append({
+                    "id":         f"{ftype}_{r[0]}",
+                    "db_id":      r[0],
+                    "type":       ftype,
+                    "name":       r[3] or "",
+                    "title":      (r[4] or r[3] or "")[:120],
+                    "channel_id": r[5],
+                    "message_id": r[2],
+                    "size":       r[6] or 0,
+                })
+        except Exception as e:
+            logger.error(f"{ftype} db error: {e}")
+
+    all_films.sort(key=_natural_sort_key)
+
     offset = (page - 1) * limit
-
-    films = []
-
-    if film_type in ("single", "all"):
-        try:
-            with sqlite3.connect(SINGLE_DB) as conn:
-                if query:
-                    rows = conn.execute(
-                        """SELECT id, file_id, message_id, file_name, file_title,
-                                  channel_id, file_size
-                           FROM single_movies
-                           WHERE file_name LIKE ? OR file_title LIKE ?
-                           LIMIT ? OFFSET ?""",
-                        (f"%{query}%", f"%{query}%", limit, offset),
-                    ).fetchall()
-                else:
-                    rows = conn.execute(
-                        """SELECT id, file_id, message_id, file_name, file_title,
-                                  channel_id, file_size
-                           FROM single_movies ORDER BY id DESC LIMIT ? OFFSET ?""",
-                        (limit, offset),
-                    ).fetchall()
-            for r in rows:
-                title = r[4] if r[4] else r[3]
-                films.append(
-                    {
-                        "id": f"single_{r[0]}",
-                        "db_id": r[0],
-                        "type": "single",
-                        "name": r[3] or "",
-                        "title": (title or r[3] or "")[:120],
-                        "channel_id": r[5],
-                        "message_id": r[2],
-                        "size": r[6] or 0,
-                    }
-                )
-        except Exception as e:
-            logger.error(f"single db error: {e}")
-
-    if film_type in ("series", "all"):
-        try:
-            with sqlite3.connect(SERIES_DB) as conn:
-                if query:
-                    rows = conn.execute(
-                        """SELECT id, file_id, message_id, file_name, file_title,
-                                  channel_id, file_size
-                           FROM series
-                           WHERE file_name LIKE ? OR file_title LIKE ?
-                           LIMIT ? OFFSET ?""",
-                        (f"%{query}%", f"%{query}%", limit, offset),
-                    ).fetchall()
-                else:
-                    rows = conn.execute(
-                        """SELECT id, file_id, message_id, file_name, file_title,
-                                  channel_id, file_size
-                           FROM series ORDER BY id DESC LIMIT ? OFFSET ?""",
-                        (limit, offset),
-                    ).fetchall()
-            for r in rows:
-                title = r[4] if r[4] else r[3]
-                films.append(
-                    {
-                        "id": f"series_{r[0]}",
-                        "db_id": r[0],
-                        "type": "series",
-                        "name": r[3] or "",
-                        "title": (title or r[3] or "")[:120],
-                        "channel_id": r[5],
-                        "message_id": r[2],
-                        "size": r[6] or 0,
-                    }
-                )
-        except Exception as e:
-            logger.error(f"series db error: {e}")
-
-    films.sort(key=_natural_sort_key)
+    films  = all_films[offset: offset + limit]
 
     return web.json_response({"films": films, "page": page})
 
