@@ -2,7 +2,7 @@
 
 const tg = window.Telegram?.WebApp;
 let initData = '';
-let filter = 'all';
+const filter = 'all';
 let page = 1;
 let busy = false;
 let debounce = null;
@@ -16,16 +16,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     try { tg.setBackgroundColor('#0a0a0f'); } catch {}
     initData = tg.initData || '';
   }
-
-  /* Filter tab clicks */
-  document.querySelectorAll('.tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      btn.classList.add('active');
-      filter = btn.dataset.f;
-      loadFilms(true);
-    });
-  });
 
   /* Search input */
   const si = document.getElementById('s-input');
