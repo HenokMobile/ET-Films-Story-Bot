@@ -4,3 +4,8 @@ pip==24.3.1
 python-dotenv>=1.1.1
 python-telegram-bot==21.10.0
 telethon==1.36.0
+aiohttp
+aiosqlite
+python-dotenv
+python-telegram-bot==21.10.0
+telethon==1.36.0
