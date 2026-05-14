@@ -4,6 +4,7 @@ import sqlite3
 import logging
 import asyncio
 from pathlib import Path
+from urllib.parse import quote
 from aiohttp import web
 
 from webapp.validate import validate_init_data
@@ -428,7 +429,7 @@ async def stream_start(request):
             request.headers.get("X-Init-Data")
             or request.query.get("initData", "")
         )
-        direct_url = f"/stream/{film_id}?initData={init_data}"
+        direct_url = f"/stream/{film_id}?initData={quote(init_data, safe='')}"
         return web.json_response({"type": "direct", "url": direct_url})
 
     from webapp import hls_manager
