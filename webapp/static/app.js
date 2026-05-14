@@ -2,10 +2,13 @@
 
 const tg = window.Telegram?.WebApp;
 let initData = '';
-const filter = 'all';
 let page = 1;
 let busy = false;
 let debounce = null;
+let isSearchMode = false;
+let searchQuery = '';
+let searchPage = 1;
+let searchBusy = false;
 
 /* ── BOOT ────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', async () => {
@@ -17,21 +20,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     initData = tg.initData || '';
   }
 
-  /* Search input */
+  /* Search input listener */
   const si = document.getElementById('s-input');
   si.addEventListener('input', () => {
     const v = si.value;
     document.getElementById('s-clear').classList.toggle('hidden', !v);
     clearTimeout(debounce);
     if (!v.trim()) {
-      document.getElementById('s-results').innerHTML =
-        '<div class="search-ph"><span>🎞</span><p>ፊልም ስም ያስገቡ</p></div>';
+      isSearchMode = false;
+      searchQuery = '';
+      document.getElementById('section-hdr').querySelector('.section-title').textContent = '🎬 ፊልሞች';
+      document.getElementById('section-count').textContent = '';
+      document.getElementById('load-more').classList.add('hidden');
+      loadFilms(true);
       return;
     }
-    debounce = setTimeout(() => doSearch(v.trim()), 420);
+    debounce = setTimeout(() => doSearch(v.trim()), 400);
   });
 
-  /* If not in Telegram, show a friendly notice */
   const inTelegram = !!(tg && tg.initData);
   if (!inTelegram) {
     showNoTelegramNotice();
@@ -64,38 +70,56 @@ function showNoTelegramNotice() {
     </div>`;
 }
 
-/* ── NAVIGATION ──────────────────────────────── */
-function showPage(name, btn) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nb').forEach(b => b.classList.remove('active'));
-  const pg = document.getElementById('pg-' + name);
-  if (pg) pg.classList.add('active');
-  (btn || document.getElementById('nb-' + name))?.classList.add('active');
-  if (name === 'search') setTimeout(() => document.getElementById('s-input').focus(), 120);
-}
-
 /* ── PROFILE ─────────────────────────────────── */
 async function loadProfile() {
   try {
     const d = await api('/api/me');
     const name = [d.first_name, d.last_name].filter(Boolean).join(' ') || 'ስም የለም';
+    const firstName = d.first_name || name;
+
+    /* Header greeting */
+    document.getElementById('h-name').textContent = firstName;
+
+    /* Drawer */
     document.getElementById('p-name').textContent = name;
     document.getElementById('p-uname').textContent = d.username ? '@' + d.username : '';
     document.getElementById('p-id').textContent = d.id || '—';
 
-    const ini = ((d.first_name || '')[0] || '') + ((d.last_name || '')[0] || '');
-    document.getElementById('av-init').textContent = ini || '👤';
+    /* Profile photo from Telegram WebApp */
+    const tgUser = tg?.initDataUnsafe?.user;
+    const photoUrl = tgUser?.photo_url || null;
+
+    if (photoUrl) {
+      /* Header icon */
+      const hPhoto = document.getElementById('prof-photo');
+      const hInit = document.getElementById('prof-init');
+      hPhoto.src = photoUrl;
+      hPhoto.classList.remove('hidden');
+      hInit.classList.add('hidden');
+      /* Drawer */
+      const dPhoto = document.getElementById('d-photo');
+      const dInit = document.getElementById('d-init');
+      dPhoto.src = photoUrl;
+      dPhoto.classList.remove('hidden');
+      dInit.classList.add('hidden');
+    } else {
+      const ini = ((d.first_name || '')[0] || '') + ((d.last_name || '')[0] || '');
+      if (ini) {
+        document.getElementById('prof-init').textContent = ini.toUpperCase();
+        document.getElementById('d-init').textContent = ini.toUpperCase();
+      }
+    }
 
     if (d.is_registered) {
-      document.getElementById('p-bal').textContent = (d.balance || 0) + ' ብር';
+      const bal = d.balance || 0;
+      document.getElementById('p-bal').textContent = bal + ' ብር';
       document.getElementById('p-phone').textContent = d.phone_number || '—';
       document.getElementById('p-refs').textContent = (d.referral_count || 0) + ' ሰዎች';
       document.getElementById('p-earn').textContent = (d.total_referral_earnings || 0) + ' ብር';
       document.getElementById('p-date').textContent = fmtDate(d.joined_date);
 
-      const pill = document.getElementById('bal-pill');
-      document.getElementById('bal-num').textContent = d.balance || 0;
-      pill.classList.remove('hidden');
+      document.getElementById('bal-num').textContent = bal;
+      document.getElementById('bal-pill').classList.remove('hidden');
     } else {
       document.getElementById('no-reg').classList.remove('hidden');
     }
@@ -104,18 +128,32 @@ async function loadProfile() {
   }
 }
 
-/* ── FILMS ───────────────────────────────────── */
+/* ── PROFILE DRAWER ──────────────────────────── */
+function openProfile() {
+  document.getElementById('profile-overlay').classList.remove('hidden');
+  document.getElementById('profile-drawer').classList.remove('hidden');
+  if (tg?.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(closeProfile); }
+}
+
+function closeProfile() {
+  document.getElementById('profile-overlay').classList.add('hidden');
+  document.getElementById('profile-drawer').classList.add('hidden');
+  if (tg?.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(closeProfile); }
+}
+
+/* ── FILMS (home grid) ───────────────────────── */
 async function loadFilms(reset) {
   if (busy) return;
   busy = true;
+  isSearchMode = false;
   if (reset) {
     page = 1;
     document.getElementById('grid').innerHTML =
-      '<div class="spinner-wrap"><div class="spinner"></div><p>ፊልሞች እየጫናን ነው...</p></div>';
+      '<div class="spinner-wrap full"><div class="spinner"></div><p>ፊልሞች እየጫናን ነው...</p></div>';
     document.getElementById('load-more').classList.add('hidden');
   }
   try {
-    const qs = new URLSearchParams({ type: filter, page, initData });
+    const qs = new URLSearchParams({ type: 'all', page, initData });
     const d = await fetch('/api/films?' + qs, { headers: { 'X-Init-Data': initData } })
       .then(r => r.json());
 
@@ -123,46 +161,49 @@ async function loadFilms(reset) {
     if (reset) grid.innerHTML = '';
 
     if (!d.films?.length) {
-      if (reset) grid.innerHTML = '<div class="spinner-wrap"><p>ፊልሞች አልተገኙም</p></div>';
+      if (reset) grid.innerHTML = '<div class="spinner-wrap full"><p>ፊልሞች አልተገኙም</p></div>';
       document.getElementById('load-more').classList.add('hidden');
       return;
     }
 
-    d.films.forEach(f => grid.appendChild(makeCard(f)));
+    d.films.forEach(f => grid.appendChild(makeTile(f)));
     document.getElementById('load-more').classList.toggle('hidden', d.films.length < 20);
     page++;
   } catch (e) {
     console.error('films:', e);
     if (reset) document.getElementById('grid').innerHTML =
-      '<div class="spinner-wrap"><p>ስህተት ተፈጠረ። እንደገና ይሞክሩ።</p></div>';
+      '<div class="spinner-wrap full"><p>ስህተት ተፈጠረ። እንደገና ይሞክሩ።</p></div>';
   } finally {
     busy = false;
   }
 }
 
-function loadMore() { loadFilms(false); }
+function loadMore() {
+  if (isSearchMode) searchLoadMore();
+  else loadFilms(false);
+}
 
 /* ── SEARCH ──────────────────────────────────── */
-let searchQuery = '';
-let searchPage = 1;
-let searchBusy = false;
-
 function clearSearch() {
   document.getElementById('s-input').value = '';
   document.getElementById('s-clear').classList.add('hidden');
-  document.getElementById('s-results').innerHTML =
-    '<div class="search-ph"><span>🎞</span><p>ፊልም ስም ያስገቡ</p></div>';
-  document.getElementById('s-load-more').classList.add('hidden');
+  isSearchMode = false;
   searchQuery = '';
   searchPage = 1;
+  document.getElementById('section-hdr').querySelector('.section-title').textContent = '🎬 ፊልሞች';
+  document.getElementById('section-count').textContent = '';
+  loadFilms(true);
 }
 
 async function doSearch(q) {
+  isSearchMode = true;
   searchQuery = q;
   searchPage = 1;
-  const res = document.getElementById('s-results');
-  res.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div><p>እየፈለግን ነው...</p></div>';
-  document.getElementById('s-load-more').classList.add('hidden');
+  document.getElementById('section-hdr').querySelector('.section-title').textContent = '🔍 ፍለጋ: ' + q;
+  document.getElementById('section-count').textContent = '';
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '<div class="spinner-wrap full"><div class="spinner"></div><p>እየፈለግን ነው...</p></div>';
+  document.getElementById('load-more').classList.add('hidden');
   await _fetchSearch(true);
 }
 
@@ -174,47 +215,48 @@ async function searchLoadMore() {
 async function _fetchSearch(reset) {
   if (searchBusy) return;
   searchBusy = true;
-  const res = document.getElementById('s-results');
-  const btn = document.getElementById('s-load-more');
+  const grid = document.getElementById('grid');
+  const btn = document.getElementById('load-more');
   try {
     const qs = new URLSearchParams({ q: searchQuery, type: 'all', page: searchPage, initData });
     const d = await fetch('/api/films?' + qs, { headers: { 'X-Init-Data': initData } })
       .then(r => r.json());
-    if (reset) res.innerHTML = '';
+    if (reset) grid.innerHTML = '';
     if (!d.films?.length) {
-      if (reset) res.innerHTML = '<div class="search-ph"><span>😕</span><p>"' + esc(searchQuery) + '" አልተገኘም</p></div>';
+      if (reset) grid.innerHTML = '<div class="search-ph"><span>😕</span><p>"' + esc(searchQuery) + '" አልተገኘም</p></div>';
       btn.classList.add('hidden');
       return;
     }
-    d.films.forEach(f => res.appendChild(makeCard(f)));
+    d.films.forEach(f => grid.appendChild(makeTile(f)));
+    const count = d.total || d.films.length;
+    document.getElementById('section-count').textContent = count + ' ፊልሞች';
     btn.classList.toggle('hidden', d.films.length < 20);
     searchPage++;
   } catch {
-    if (reset) res.innerHTML = '<div class="search-ph"><span>⚠️</span><p>ስህተት ተፈጠረ</p></div>';
+    if (reset) grid.innerHTML = '<div class="search-ph"><span>⚠️</span><p>ስህተት ተፈጠረ</p></div>';
   } finally {
     searchBusy = false;
   }
 }
 
-/* ── CARD BUILDER ────────────────────────────── */
-function makeCard(f) {
+/* ── TILE BUILDER (3-col grid) ───────────────── */
+function makeTile(f) {
   const div = document.createElement('div');
-  div.className = 'card';
+  div.className = 'film-tile';
 
   const sz = fmtSize(f.size);
-
   let title = (f.name || f.title || 'ፊልም').replace(/@\w+/g, '').replace(/\s+/g, ' ').trim();
-  if (title.length > 90) title = title.slice(0, 90) + '…';
+  if (title.length > 60) title = title.slice(0, 60) + '…';
 
   div.innerHTML = `
-    <div class="card-thumb">🎬</div>
-    <div class="card-body">
-      <div class="card-title">${esc(title)}</div>
-      <div class="card-meta">
-        ${sz ? `<span class="card-size">${sz}</span>` : ''}
-      </div>
+    <div class="tile-thumb">
+      🎬
+      <div class="tile-play-icon">▶</div>
     </div>
-    <div class="card-play">▶️</div>`;
+    <div class="tile-body">
+      <div class="tile-title">${esc(title)}</div>
+      ${sz ? `<div class="tile-size">${sz}</div>` : ''}
+    </div>`;
 
   div.onclick = () => openPlayer(f.id, title);
   return div;
@@ -229,15 +271,12 @@ function _playerReset() {
   const load   = document.getElementById('vid-loading');
   const errDiv = document.getElementById('vid-error');
   const tapDiv = document.getElementById('vid-tap');
-  /* destroy previous HLS instance */
   if (_hlsInstance) { _hlsInstance.destroy(); _hlsInstance = null; }
-  /* reset video element */
   vid.pause();
   vid.removeAttribute('src');
   vid.load();
   vid.oncanplay = null; vid.onerror = null; vid.onstalled = null;
   vid.onplaying = null; vid.onwaiting = null;
-  /* reset overlay states */
   vid.classList.add('hidden');
   load.classList.remove('hidden');
   errDiv.classList.add('hidden');
@@ -277,11 +316,9 @@ async function openPlayer(filmId, title) {
 
   const { vid, load, errDiv, tapDiv } = _playerReset();
 
-  /* Ask server: direct MP4 stream or HLS transcoding? */
   let info;
   try {
     const qs = new URLSearchParams({ initData });
-    /* Show a "preparing" message while server starts HLS (can take ~5-10s) */
     const statusTxt = load.querySelector('.vid-status-txt');
     if (statusTxt) statusTxt.textContent = 'ፊልም እያዘጋጀን ነው…';
     const r = await fetch(
@@ -301,13 +338,8 @@ async function openPlayer(filmId, title) {
   _attachVideoEvents(vid, load, errDiv, tapDiv);
 
   if (info.type === 'hls') {
-    /* HLS path — use hls.js (required on Android Chrome) */
     if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-      const hls = new Hls({
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        lowLatencyMode: false,
-      });
+      const hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60, lowLatencyMode: false });
       _hlsInstance = hls;
       hls.loadSource(info.url);
       hls.attachMedia(vid);
@@ -319,14 +351,12 @@ async function openPlayer(filmId, title) {
         }
       });
     } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
-      /* Native HLS (Safari iOS) */
       vid.src = info.url;
     } else {
       errDiv.classList.remove('hidden');
       load.classList.add('hidden');
     }
   } else {
-    /* Direct MP4 — native <video> with byte-range seeking */
     vid.src = info.url;
   }
 }
