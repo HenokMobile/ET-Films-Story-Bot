@@ -249,8 +249,12 @@ function makeTile(f) {
   if (title.length > 60) title = title.slice(0, 60) + '…';
 
   const holes = Array(5).fill('<div class="film-hole"></div>').join('');
+  const posterHtml = f.poster_url
+    ? `<img class="tile-poster" src="${esc(f.poster_url)}" alt="${esc(title)}" loading="lazy" onerror="this.style.display='none'">`
+    : '';
   div.innerHTML = `
     <div class="tile-thumb">
+      ${posterHtml}
       <div class="film-strip-top">${holes}</div>
       <div class="tile-play-center"><div class="tile-play-arrow"></div></div>
       <div class="film-strip-bot">${holes}</div>

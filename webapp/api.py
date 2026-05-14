@@ -6,6 +6,7 @@ import logging
 import asyncio
 from pathlib import Path
 from urllib.parse import quote
+import aiohttp
 from aiohttp import web
 
 from webapp.validate import validate_init_data
@@ -14,6 +15,40 @@ from webapp.telethon_stream import get_file_info, iter_file_chunks
 FFMPEG = "ffmpeg"
 _NATIVE_TYPES = {"video/mp4", "video/webm", "video/ogg"}
 _NATIVE_EXTS  = {".mp4", ".webm", ".m4v", ".ogv"}
+
+TMDB_API_KEY    = os.getenv("TMDB_API_KEY", "")
+TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w300"
+_TMDB_SEARCH    = "https://api.themoviedb.org/3/search/{kind}?api_key={key}&query={q}&language=en-US&page=1"
+_EXT_RE         = re.compile(r'\.(mkv|mp4|avi|mov|wmv|flv|webm|m4v|ts|m2ts)$', re.I)
+_JUNK_RE        = re.compile(r'@\w+|[\[\(]\d{4}[\]\)]|\b(1080p|720p|480p|4k|hdr|bluray|webrip|hdtv|x264|x265|hevc|aac|ac3)\b', re.I)
+
+
+def _clean_title(name: str) -> str:
+    t = _EXT_RE.sub('', name or '')
+    t = _JUNK_RE.sub('', t)
+    t = re.sub(r'\s+', ' ', t).strip(' .-_')
+    return t
+
+
+async def _fetch_tmdb_poster(session: aiohttp.ClientSession, title: str, ftype: str) -> str:
+    if not TMDB_API_KEY or not title:
+        return ""
+    clean = _clean_title(title)
+    if not clean:
+        return ""
+    kind = "tv" if ftype == "series" else "movie"
+    url  = _TMDB_SEARCH.format(kind=kind, key=TMDB_API_KEY, q=quote(clean))
+    try:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
+            if resp.status != 200:
+                return ""
+            data = await resp.json()
+            results = data.get("results", [])
+            if results and results[0].get("poster_path"):
+                return TMDB_IMAGE_BASE + results[0]["poster_path"]
+    except Exception:
+        pass
+    return ""
 
 
 def _natural_sort_key(film: dict) -> list:
@@ -152,6 +187,18 @@ async def get_films(request):
 
     offset = (page - 1) * limit
     films  = all_films[offset: offset + limit]
+
+    if TMDB_API_KEY and films:
+        async with aiohttp.ClientSession() as session:
+            posters = await asyncio.gather(*[
+                _fetch_tmdb_poster(session, f.get("title") or f.get("name", ""), f["type"])
+                for f in films
+            ])
+        for film, poster in zip(films, posters):
+            film["poster_url"] = poster
+    else:
+        for film in films:
+            film["poster_url"] = ""
 
     return web.json_response({"films": films, "page": page})
 
