@@ -6,33 +6,43 @@ import signal
 import os
 from aiohttp import web
 
-# Add bot directory to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'bot'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "bot"))
 
-# Configure logging
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
 
+
 async def health_check(request):
-    """Simple health check endpoint for Replit deployment"""
     return web.Response(text="ET Films Bot is running! 🎬", status=200)
 
+
 async def run_health_server():
-    """Run a lightweight HTTP server on port 8080 for Replit health checks"""
     app = web.Application()
-    app.router.add_get('/', health_check)
-    app.router.add_get('/health', health_check)
+    app.router.add_get("/", health_check)
+    app.router.add_get("/health", health_check)
+
+    from webapp.api import setup_webapp_routes
+    setup_webapp_routes(app)
+
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    site = web.TCPSite(runner, "0.0.0.0", 8080)
     await site.start()
-    logger.info("✅ Health check server running on port 8080")
+    logger.info("✅ Server running on port 8080 (health + mini-app)")
+
+
+async def run_telethon():
+    try:
+        from webapp.telethon_stream import start_client
+        await start_client()
+    except Exception as e:
+        logger.warning(f"Telethon start skipped: {e}")
+
 
 async def run_main_bot():
-    """Run the main ET Films Story Bot"""
     try:
         logger.info("🎬 Starting ET Films Story Bot...")
         from bot import main as bot_main
@@ -40,32 +50,31 @@ async def run_main_bot():
     except Exception as e:
         logger.error(f"❌ ET Films Story Bot error: {e}")
 
+
 async def main():
-    """Main function to run the bot"""
     print("🚀 Starting ET Films Story Bot...")
     print("=" * 50)
     print("🎬 ET Films Story Bot")
     print("=" * 50)
 
     try:
-        # Start health check server AND bot in parallel
         await asyncio.gather(
             run_health_server(),
-            run_main_bot()
+            run_telethon(),
+            run_main_bot(),
         )
     except KeyboardInterrupt:
         print("\n🛑 Stopping bot...")
-        print("👋 Bot stopped!")
     except Exception as e:
         logger.error(f"❌ Fatal error: {e}")
 
+
 def signal_handler(signum, frame):
-    """Handle shutdown signals"""
     print(f"\n📡 Signal {signum} received, shutting down...")
     sys.exit(0)
 
+
 if __name__ == "__main__":
-    # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 

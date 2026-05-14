@@ -1,6 +1,7 @@
 import logging
 import asyncio
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+import os
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 import config
 from database import db
@@ -29,13 +30,22 @@ WAITING_FOR_ALL_SEARCH = "waiting_for_all_search"
 ADMIN_SETTING_SINGLE_CHANNEL = "admin_setting_single_channel"
 ADMIN_SETTING_SERIES_CHANNEL = "admin_setting_series_channel"
 
-# Reply Keyboard - Pre-built for faster response
-_MAIN_KEYBOARD = ReplyKeyboardMarkup([
-    [KeyboardButton("ተከታታይ ፊልም 📽"), KeyboardButton("ነጠላ ፊልም 🎬")],
-    [KeyboardButton("🎞 ሁሉንም ፊልም")],
-    [KeyboardButton("ቀር ሂሳብ 💰"), KeyboardButton("ገቢ ለማድረግ 🏦")],
-    [KeyboardButton("ለመጋበዝ 🎁"), KeyboardButton("⚙️ አጠቃቀም")]
-], resize_keyboard=True)
+# Reply Keyboard - built at import time using runtime env
+def _build_keyboard():
+    _domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
+    _url = f"https://{_domain}/webapp/" if _domain else None
+    row_films = [KeyboardButton("ተከታታይ ፊልም 📽"), KeyboardButton("ነጠላ ፊልም 🎬")]
+    row_all = [KeyboardButton("🎞 ሁሉንም ፊልም")]
+    if _url:
+        row_all.append(KeyboardButton("📱 Mini App", web_app=WebAppInfo(url=_url)))
+    return ReplyKeyboardMarkup([
+        row_films,
+        row_all,
+        [KeyboardButton("ቀር ሂሳብ 💰"), KeyboardButton("ገቢ ለማድረግ 🏦")],
+        [KeyboardButton("ለመጋበዝ 🎁"), KeyboardButton("⚙️ አጠቃቀም")]
+    ], resize_keyboard=True)
+
+_MAIN_KEYBOARD = _build_keyboard()
 
 def get_main_keyboard():
     return _MAIN_KEYBOARD

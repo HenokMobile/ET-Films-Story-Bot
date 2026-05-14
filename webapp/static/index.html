@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+  <meta name="theme-color" content="#0a0a0f">
+  <title>ET Films</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/webapp/static/style.css">
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="splash-inner">
+    <div class="splash-icon">🎬</div>
+    <div class="splash-title">ET Films</div>
+    <div class="splash-sub">እየጫናን ነው...</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+
+  <!-- Header -->
+  <header>
+    <span class="app-logo">🎬 ET Films</span>
+    <span id="bal-pill" class="balance-pill hidden"><span id="bal-num">0</span> ብር</span>
+  </header>
+
+  <!-- Pages -->
+  <div id="pages">
+
+    <!-- HOME -->
+    <div id="pg-home" class="page active">
+      <div class="scroll">
+        <div class="hero">
+          <h2>🎬 ፊልሞች</h2>
+          <p>አዲስ ፊልሞች ይከታተሉ</p>
+        </div>
+        <div class="tabs">
+          <button class="tab active" data-f="all">ሁሉም</button>
+          <button class="tab" data-f="single">ነጠላ ፊልም</button>
+          <button class="tab" data-f="series">ተከታታይ</button>
+        </div>
+        <div id="grid" class="grid">
+          <div class="spinner-wrap"><div class="spinner"></div><p>ፊልሞች እየጫናን ነው...</p></div>
+        </div>
+        <button id="load-more" class="load-more hidden" onclick="loadMore()">ተጨማሪ ፊልሞች</button>
+      </div>
+    </div>
+
+    <!-- SEARCH -->
+    <div id="pg-search" class="page">
+      <div class="scroll">
+        <div class="search-wrap">
+          <div class="search-box">
+            <span class="s-icon">🔍</span>
+            <input id="s-input" type="text" placeholder="ፊልም ስም ያስገቡ..." autocomplete="off">
+            <button id="s-clear" class="s-clear hidden" onclick="clearSearch()">✕</button>
+          </div>
+        </div>
+        <div id="s-results" class="grid">
+          <div class="search-ph"><span>🎞</span><p>ፊልም ስም ያስገቡ</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROFILE -->
+    <div id="pg-profile" class="page">
+      <div class="scroll">
+        <div class="prof-head">
+          <div class="avatar"><span id="av-init">?</span></div>
+          <div class="prof-name" id="p-name">...</div>
+          <div class="prof-uname" id="p-uname"></div>
+        </div>
+
+        <div class="info-list">
+          <div class="info-row gold">
+            <span class="info-icon">💰</span>
+            <div><div class="info-lbl">ቀር ሂሳብ</div><div class="info-val" id="p-bal">0 ብር</div></div>
+          </div>
+          <div class="info-row">
+            <span class="info-icon">📱</span>
+            <div><div class="info-lbl">ስልክ ቁጥር</div><div class="info-val" id="p-phone">—</div></div>
+          </div>
+          <div class="info-row">
+            <span class="info-icon">🎁</span>
+            <div><div class="info-lbl">የጋበዙ ሰዎች</div><div class="info-val" id="p-refs">0 ሰዎች</div></div>
+          </div>
+          <div class="info-row">
+            <span class="info-icon">💎</span>
+            <div><div class="info-lbl">ከጋበዛ የተገኘ ብር</div><div class="info-val" id="p-earn">0 ብር</div></div>
+          </div>
+          <div class="info-row">
+            <span class="info-icon">📅</span>
+            <div><div class="info-lbl">የተቀላቀሉበት ቀን</div><div class="info-val" id="p-date">—</div></div>
+          </div>
+          <div class="info-row">
+            <span class="info-icon">🆔</span>
+            <div><div class="info-lbl">Telegram ID</div><div class="info-val" id="p-id">—</div></div>
+          </div>
+        </div>
+
+        <div id="no-reg" class="notice hidden">
+          ⚠️ Bot ላይ ገና አልተመዘገቡም። Telegram bot ላይ /start ይጻፉ።
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav class="nav">
+    <button class="nb active" id="nb-home" onclick="showPage('home',this)">
+      <span class="nb-icon">🏠</span><span class="nb-lbl">ዋና ገፅ</span>
+    </button>
+    <button class="nb" id="nb-search" onclick="showPage('search',this)">
+      <span class="nb-icon">🔍</span><span class="nb-lbl">ፍለጋ</span>
+    </button>
+    <button class="nb" id="nb-profile" onclick="showPage('profile',this)">
+      <span class="nb-icon">👤</span><span class="nb-lbl">መገለጫ</span>
+    </button>
+  </nav>
+</div>
+
+<!-- VIDEO PLAYER -->
+<div id="player" class="player hidden">
+  <div class="player-top">
+    <button class="back-btn" onclick="closePlayer()">← ተመለስ</button>
+    <div class="player-ttl" id="pl-title">ፊልም</div>
+  </div>
+  <div class="player-body">
+    <video id="vid" controls playsinline preload="metadata"></video>
+  </div>
+  <div class="player-foot">
+    <div class="player-fname" id="pl-fname"></div>
+  </div>
+</div>
+
+<script src="/webapp/static/app.js"></script>
+</body>
+</html>
