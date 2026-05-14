@@ -153,28 +153,56 @@ async function loadFilms(reset) {
 function loadMore() { loadFilms(false); }
 
 /* ── SEARCH ──────────────────────────────────── */
+let searchQuery = '';
+let searchPage = 1;
+let searchBusy = false;
+
 function clearSearch() {
   document.getElementById('s-input').value = '';
   document.getElementById('s-clear').classList.add('hidden');
   document.getElementById('s-results').innerHTML =
     '<div class="search-ph"><span>🎞</span><p>ፊልም ስም ያስገቡ</p></div>';
+  document.getElementById('s-load-more').classList.add('hidden');
+  searchQuery = '';
+  searchPage = 1;
 }
 
 async function doSearch(q) {
+  searchQuery = q;
+  searchPage = 1;
   const res = document.getElementById('s-results');
   res.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div><p>እየፈለግን ነው...</p></div>';
+  document.getElementById('s-load-more').classList.add('hidden');
+  await _fetchSearch(true);
+}
+
+async function searchLoadMore() {
+  if (searchBusy || !searchQuery) return;
+  await _fetchSearch(false);
+}
+
+async function _fetchSearch(reset) {
+  if (searchBusy) return;
+  searchBusy = true;
+  const res = document.getElementById('s-results');
+  const btn = document.getElementById('s-load-more');
   try {
-    const qs = new URLSearchParams({ q, type: 'all', initData });
+    const qs = new URLSearchParams({ q: searchQuery, type: 'all', page: searchPage, initData });
     const d = await fetch('/api/films?' + qs, { headers: { 'X-Init-Data': initData } })
       .then(r => r.json());
-    res.innerHTML = '';
+    if (reset) res.innerHTML = '';
     if (!d.films?.length) {
-      res.innerHTML = '<div class="search-ph"><span>😕</span><p>"' + esc(q) + '" አልተገኘም</p></div>';
+      if (reset) res.innerHTML = '<div class="search-ph"><span>😕</span><p>"' + esc(searchQuery) + '" አልተገኘም</p></div>';
+      btn.classList.add('hidden');
       return;
     }
     d.films.forEach(f => res.appendChild(makeCard(f)));
+    btn.classList.toggle('hidden', d.films.length < 20);
+    searchPage++;
   } catch {
-    res.innerHTML = '<div class="search-ph"><span>⚠️</span><p>ስህተት ተፈጠረ</p></div>';
+    if (reset) res.innerHTML = '<div class="search-ph"><span>⚠️</span><p>ስህተት ተፈጠረ</p></div>';
+  } finally {
+    searchBusy = false;
   }
 }
 
