@@ -2,19 +2,18 @@
 
 const tg = window.Telegram?.WebApp;
 let initData = '';
-let currentFilter = 'all';
+const filter = 'all';
 let page = 1;
 let busy = false;
 let debounce = null;
-let totalCounts = { single: 0, series: 0 };
 
 /* ── BOOT ────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', async () => {
   if (tg) {
     tg.ready();
     tg.expand();
-    try { tg.setHeaderColor('#090910'); } catch {}
-    try { tg.setBackgroundColor('#090910'); } catch {}
+    try { tg.setHeaderColor('#0a0a0f'); } catch {}
+    try { tg.setBackgroundColor('#0a0a0f'); } catch {}
     initData = tg.initData || '';
   }
 
@@ -23,13 +22,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   si.addEventListener('input', () => {
     const v = si.value;
     document.getElementById('s-clear').classList.toggle('hidden', !v);
-    const lbl = document.getElementById('s-label');
     clearTimeout(debounce);
     if (!v.trim()) {
-      lbl.style.display = 'none';
       document.getElementById('s-results').innerHTML =
-        '<div class="search-ph"><span>🎞</span><p>ፊልም ስም ያስገቡ ለመፈለግ</p></div>';
-      document.getElementById('s-load-more').classList.add('hidden');
+        '<div class="search-ph"><span>🎞</span><p>ፊልም ስም ያስገቡ</p></div>';
       return;
     }
     debounce = setTimeout(() => doSearch(v.trim()), 420);
@@ -53,7 +49,7 @@ function showApp() {
   setTimeout(() => {
     sp.style.display = 'none';
     document.getElementById('app').classList.remove('hidden');
-  }, 500);
+  }, 480);
 }
 
 /* ── NOT-IN-TELEGRAM NOTICE ──────────────────── */
@@ -78,14 +74,6 @@ function showPage(name, btn) {
   if (name === 'search') setTimeout(() => document.getElementById('s-input').focus(), 120);
 }
 
-/* ── FILTER TABS ─────────────────────────────── */
-function setFilter(val, btn) {
-  currentFilter = val;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  loadFilms(true);
-}
-
 /* ── PROFILE ─────────────────────────────────── */
 async function loadProfile() {
   try {
@@ -99,25 +87,14 @@ async function loadProfile() {
     document.getElementById('av-init').textContent = ini || '👤';
 
     if (d.is_registered) {
-      const bal = d.balance || 0;
-      const refs = d.referral_count || 0;
-      const earn = d.total_referral_earnings || 0;
-
-      document.getElementById('p-bal').textContent = bal + ' ብር';
+      document.getElementById('p-bal').textContent = (d.balance || 0) + ' ብር';
       document.getElementById('p-phone').textContent = d.phone_number || '—';
-      document.getElementById('p-refs').textContent = refs + ' ሰዎች';
-      document.getElementById('p-earn').textContent = earn + ' ብር';
+      document.getElementById('p-refs').textContent = (d.referral_count || 0) + ' ሰዎች';
+      document.getElementById('p-earn').textContent = (d.total_referral_earnings || 0) + ' ብር';
       document.getElementById('p-date').textContent = fmtDate(d.joined_date);
 
-      /* top stats strip */
-      document.getElementById('ps-bal').textContent = bal + ' ብር';
-      document.getElementById('ps-refs').textContent = refs;
-      document.getElementById('ps-earn').textContent = earn + ' ብር';
-      document.getElementById('prof-stats').classList.remove('hidden');
-
-      /* header pill */
       const pill = document.getElementById('bal-pill');
-      document.getElementById('bal-num').textContent = bal;
+      document.getElementById('bal-num').textContent = d.balance || 0;
       pill.classList.remove('hidden');
     } else {
       document.getElementById('no-reg').classList.remove('hidden');
@@ -138,7 +115,7 @@ async function loadFilms(reset) {
     document.getElementById('load-more').classList.add('hidden');
   }
   try {
-    const qs = new URLSearchParams({ type: currentFilter, page, initData });
+    const qs = new URLSearchParams({ type: filter, page, initData });
     const d = await fetch('/api/films?' + qs, { headers: { 'X-Init-Data': initData } })
       .then(r => r.json());
 
@@ -150,9 +127,6 @@ async function loadFilms(reset) {
       document.getElementById('load-more').classList.add('hidden');
       return;
     }
-
-    /* update hero stats on first load */
-    if (reset && page === 1) updateHeroStats(d.films);
 
     d.films.forEach(f => grid.appendChild(makeCard(f)));
     document.getElementById('load-more').classList.toggle('hidden', d.films.length < 20);
@@ -168,37 +142,25 @@ async function loadFilms(reset) {
 
 function loadMore() { loadFilms(false); }
 
-function updateHeroStats(films) {
-  const singles = films.filter(f => f.type === 'single').length;
-  const series  = films.filter(f => f.type === 'series').length;
-  document.getElementById('hs-single').textContent = singles + '+';
-  document.getElementById('hs-series').textContent = series  + '+';
-  document.getElementById('hs-total').textContent  = films.length + '+';
-  document.getElementById('hero-stats').classList.remove('hidden');
-}
-
 /* ── SEARCH ──────────────────────────────────── */
 let searchQuery = '';
-let searchPage  = 1;
-let searchBusy  = false;
+let searchPage = 1;
+let searchBusy = false;
 
 function clearSearch() {
   document.getElementById('s-input').value = '';
   document.getElementById('s-clear').classList.add('hidden');
-  document.getElementById('s-label').style.display = 'none';
   document.getElementById('s-results').innerHTML =
-    '<div class="search-ph"><span>🎞</span><p>ፊልም ስም ያስገቡ ለመፈለግ</p></div>';
+    '<div class="search-ph"><span>🎞</span><p>ፊልም ስም ያስገቡ</p></div>';
   document.getElementById('s-load-more').classList.add('hidden');
   searchQuery = '';
-  searchPage  = 1;
+  searchPage = 1;
 }
 
 async function doSearch(q) {
   searchQuery = q;
-  searchPage  = 1;
+  searchPage = 1;
   const res = document.getElementById('s-results');
-  const lbl = document.getElementById('s-label');
-  lbl.style.display = 'none';
   res.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div><p>እየፈለግን ነው...</p></div>';
   document.getElementById('s-load-more').classList.add('hidden');
   await _fetchSearch(true);
@@ -214,21 +176,16 @@ async function _fetchSearch(reset) {
   searchBusy = true;
   const res = document.getElementById('s-results');
   const btn = document.getElementById('s-load-more');
-  const lbl = document.getElementById('s-label');
   try {
     const qs = new URLSearchParams({ q: searchQuery, type: 'all', page: searchPage, initData });
     const d = await fetch('/api/films?' + qs, { headers: { 'X-Init-Data': initData } })
       .then(r => r.json());
     if (reset) res.innerHTML = '';
     if (!d.films?.length) {
-      if (reset) res.innerHTML =
-        '<div class="search-ph"><span>😕</span><p>"' + esc(searchQuery) + '" አልተገኘም</p></div>';
+      if (reset) res.innerHTML = '<div class="search-ph"><span>😕</span><p>"' + esc(searchQuery) + '" አልተገኘም</p></div>';
       btn.classList.add('hidden');
-      lbl.style.display = 'none';
       return;
     }
-    lbl.style.display = 'block';
-    lbl.textContent = '"' + searchQuery + '" — ውጤቶች';
     d.films.forEach(f => res.appendChild(makeCard(f)));
     btn.classList.toggle('hidden', d.films.length < 20);
     searchPage++;
@@ -244,32 +201,20 @@ function makeCard(f) {
   const div = document.createElement('div');
   div.className = 'card';
 
-  const sz    = fmtSize(f.size);
-  const isSeries = f.type === 'series';
+  const sz = fmtSize(f.size);
 
   let title = (f.name || f.title || 'ፊልም').replace(/@\w+/g, '').replace(/\s+/g, ' ').trim();
   if (title.length > 90) title = title.slice(0, 90) + '…';
 
-  const thumbClass = isSeries ? 'series' : 'single';
-  const thumbIcon  = isSeries ? '📺' : '🎬';
-  const badgeHtml  = isSeries
-    ? '<span class="badge badge-e">ተከታታይ</span>'
-    : '<span class="badge badge-s">ነጠላ</span>';
-
   div.innerHTML = `
-    <div class="card-thumb ${thumbClass}">
-      <span class="card-thumb-icon">${thumbIcon}</span>
-    </div>
+    <div class="card-thumb">🎬</div>
     <div class="card-body">
       <div class="card-title">${esc(title)}</div>
       <div class="card-meta">
-        ${badgeHtml}
         ${sz ? `<span class="card-size">${sz}</span>` : ''}
       </div>
     </div>
-    <div class="card-play">
-      <div class="play-circle">▶</div>
-    </div>`;
+    <div class="card-play">▶️</div>`;
 
   div.onclick = () => openPlayer(f.id, title);
   return div;
@@ -284,12 +229,15 @@ function _playerReset() {
   const load   = document.getElementById('vid-loading');
   const errDiv = document.getElementById('vid-error');
   const tapDiv = document.getElementById('vid-tap');
+  /* destroy previous HLS instance */
   if (_hlsInstance) { _hlsInstance.destroy(); _hlsInstance = null; }
+  /* reset video element */
   vid.pause();
   vid.removeAttribute('src');
   vid.load();
   vid.oncanplay = null; vid.onerror = null; vid.onstalled = null;
   vid.onplaying = null; vid.onwaiting = null;
+  /* reset overlay states */
   vid.classList.add('hidden');
   load.classList.remove('hidden');
   errDiv.classList.add('hidden');
@@ -329,9 +277,11 @@ async function openPlayer(filmId, title) {
 
   const { vid, load, errDiv, tapDiv } = _playerReset();
 
+  /* Ask server: direct MP4 stream or HLS transcoding? */
   let info;
   try {
     const qs = new URLSearchParams({ initData });
+    /* Show a "preparing" message while server starts HLS (can take ~5-10s) */
     const statusTxt = load.querySelector('.vid-status-txt');
     if (statusTxt) statusTxt.textContent = 'ፊልም እያዘጋጀን ነው…';
     const r = await fetch(
@@ -351,8 +301,13 @@ async function openPlayer(filmId, title) {
   _attachVideoEvents(vid, load, errDiv, tapDiv);
 
   if (info.type === 'hls') {
+    /* HLS path — use hls.js (required on Android Chrome) */
     if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-      const hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60, lowLatencyMode: false });
+      const hls = new Hls({
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        lowLatencyMode: false,
+      });
       _hlsInstance = hls;
       hls.loadSource(info.url);
       hls.attachMedia(vid);
@@ -364,12 +319,14 @@ async function openPlayer(filmId, title) {
         }
       });
     } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
+      /* Native HLS (Safari iOS) */
       vid.src = info.url;
     } else {
       errDiv.classList.remove('hidden');
       load.classList.add('hidden');
     }
   } else {
+    /* Direct MP4 — native <video> with byte-range seeking */
     vid.src = info.url;
   }
 }
