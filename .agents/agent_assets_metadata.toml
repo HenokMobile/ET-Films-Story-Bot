@@ -1,0 +1,13 @@
+uploads = []
+
+[[generated]]
+id = "8lNY4xpPzdp9II8zdIpJf"
+uri = "file://webapp/static/logo.png"
+type = "image"
+title = "ET Films logo"
+
+[[outputs]]
+id = "r6YYTuSBvk7PpggczUiRY"
+uri = "file://webapp/static/logo.png"
+type = "image"
+title = "ET Films Logo"
