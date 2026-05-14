@@ -2,11 +2,23 @@ import os
 import json
 import sqlite3
 import logging
+import asyncio
 from pathlib import Path
 from aiohttp import web
 
 from webapp.validate import validate_init_data
 from webapp.telethon_stream import get_file_info, iter_file_chunks
+
+FFMPEG = "ffmpeg"
+_NATIVE_TYPES = {"video/mp4", "video/webm", "video/ogg"}
+_NATIVE_EXTS  = {".mp4", ".webm", ".m4v", ".ogv"}
+
+
+def _needs_transcode(mime: str, fname: str) -> bool:
+    if mime in _NATIVE_TYPES:
+        return False
+    ext = os.path.splitext(fname or "")[-1].lower()
+    return ext not in _NATIVE_EXTS
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +178,153 @@ async def get_films(request):
     return web.json_response({"films": films, "page": page})
 
 
+async def _stream_direct(request, file_info, file_name):
+    """MP4/WebM: serve with byte-range support (seeking works)."""
+    total_size = file_info["size"]
+    mime_type  = file_info["mime_type"]
+    start, end, status = 0, total_size - 1, 200
+
+    range_header = request.headers.get("Range", "")
+    if range_header and range_header.startswith("bytes="):
+        try:
+            spec  = range_header[6:].split("-")
+            start = int(spec[0]) if spec[0] else 0
+            end   = int(spec[1]) if len(spec) > 1 and spec[1] else total_size - 1
+            status = 206
+        except Exception:
+            pass
+
+    end = min(end, total_size - 1)
+    headers = {
+        "Content-Type":        mime_type,
+        "Content-Length":      str(end - start + 1),
+        "Accept-Ranges":       "bytes",
+        "Content-Disposition": f'inline; filename="{file_name}"',
+    }
+    if status == 206:
+        headers["Content-Range"] = f"bytes {start}-{end}/{total_size}"
+
+    response = web.StreamResponse(status=status, headers=headers)
+    await response.prepare(request)
+    try:
+        async for chunk in iter_file_chunks(file_info["document"], start, end):
+            await response.write(chunk)
+    except (ConnectionResetError, ConnectionAbortedError):
+        pass
+    except Exception as e:
+        logger.debug(f"Direct stream interrupted: {e}")
+    return response
+
+
+def _make_ffmpeg_cmd(copy_video: bool) -> list:
+    """Build FFmpeg command for pipe-based transcoding to fragmented MP4."""
+    video_args = (
+        ["-c:v", "copy"]
+        if copy_video
+        else ["-c:v", "libx264", "-preset", "superfast", "-crf", "28"]
+    )
+    return [
+        FFMPEG, "-y",
+        "-i", "pipe:0",
+        *video_args,
+        "-c:a", "aac", "-ac", "2", "-ar", "44100",
+        "-movflags", "frag_keyframe+empty_moov+default_base_moof",
+        "-f", "mp4",
+        "pipe:1",
+    ]
+
+
+async def _run_ffmpeg(file_info, cmd):
+    """Start FFmpeg, feed input from Telethon, return (proc, feed_task, first_chunk).
+    Returns (None, None, None) if FFmpeg produced no output within timeout."""
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+
+    async def feed():
+        try:
+            async for chunk in iter_file_chunks(
+                file_info["document"], 0, file_info["size"] - 1
+            ):
+                if proc.stdin.is_closing():
+                    break
+                proc.stdin.write(chunk)
+                await proc.stdin.drain()
+        except Exception as fe:
+            logger.debug(f"FFmpeg feed: {fe}")
+        finally:
+            try:
+                proc.stdin.close()
+            except Exception:
+                pass
+
+    feed_task = asyncio.create_task(feed())
+
+    try:
+        first_chunk = await asyncio.wait_for(proc.stdout.read(131072), timeout=25)
+        if not first_chunk:
+            raise ValueError("empty output")
+        return proc, feed_task, first_chunk
+    except Exception:
+        feed_task.cancel()
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        return None, None, None
+
+
+async def _stream_transcode(request, file_info, file_name):
+    """AVI/MKV/etc.: pipe through FFmpeg → fragmented MP4 (no seeking)."""
+    response = web.StreamResponse(
+        status=200,
+        headers={
+            "Content-Type":        "video/mp4",
+            "Cache-Control":       "no-cache, no-store",
+            "Content-Disposition": f'inline; filename="{os.path.splitext(file_name)[0]}.mp4"',
+            "X-Transcode":         "1",
+        },
+    )
+    await response.prepare(request)
+
+    # Try fast path: remux only (works when video is already H.264)
+    proc, feed_task, first_chunk = await _run_ffmpeg(file_info, _make_ffmpeg_cmd(copy_video=True))
+
+    # Fallback: full libx264 encode (handles XviD / DivX / MPEG-4 ASP)
+    if proc is None:
+        logger.info(f"FFmpeg copy failed for '{file_name}', retrying with libx264 encode")
+        proc, feed_task, first_chunk = await _run_ffmpeg(file_info, _make_ffmpeg_cmd(copy_video=False))
+
+    if proc is None:
+        logger.error(f"FFmpeg failed entirely for '{file_name}'")
+        return response
+
+    # Write the first chunk that was used for detection
+    try:
+        await response.write(first_chunk)
+        # Stream the rest
+        while True:
+            chunk = await proc.stdout.read(65536)
+            if not chunk:
+                break
+            await response.write(chunk)
+    except (ConnectionResetError, ConnectionAbortedError):
+        pass
+    except Exception as e:
+        logger.debug(f"Transcode stream write: {e}")
+    finally:
+        feed_task.cancel()
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+    return response
+
+
 async def stream_film(request):
     user = _auth(request)
     if not user:
@@ -209,46 +368,12 @@ async def stream_film(request):
             text="Streaming unavailable. Please set TELEGRAM_API_ID and TELEGRAM_API_HASH."
         )
 
-    total_size = file_info["size"]
     mime_type = file_info["mime_type"]
-    start = 0
-    end = total_size - 1
-    status = 200
-
-    range_header = request.headers.get("Range", "")
-    if range_header and range_header.startswith("bytes="):
-        try:
-            spec = range_header[6:].split("-")
-            start = int(spec[0]) if spec[0] else 0
-            end = int(spec[1]) if len(spec) > 1 and spec[1] else total_size - 1
-            status = 206
-        except Exception:
-            pass
-
-    end = min(end, total_size - 1)
-    content_length = end - start + 1
-
-    headers = {
-        "Content-Type": mime_type,
-        "Content-Length": str(content_length),
-        "Accept-Ranges": "bytes",
-        "Content-Disposition": f'inline; filename="{file_name}"',
-    }
-    if status == 206:
-        headers["Content-Range"] = f"bytes {start}-{end}/{total_size}"
-
-    response = web.StreamResponse(status=status, headers=headers)
-    await response.prepare(request)
-
-    try:
-        async for chunk in iter_file_chunks(file_info["document"], start, end):
-            await response.write(chunk)
-    except (ConnectionResetError, ConnectionAbortedError):
-        pass
-    except Exception as e:
-        logger.debug(f"Stream interrupted: {e}")
-
-    return response
+    if _needs_transcode(mime_type, file_name):
+        logger.info(f"Transcoding {file_name} (mime={mime_type})")
+        return await _stream_transcode(request, file_info, file_name)
+    else:
+        return await _stream_direct(request, file_info, file_name)
 
 
 def setup_webapp_routes(app: web.Application):
