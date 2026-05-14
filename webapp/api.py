@@ -16,7 +16,6 @@ FFMPEG = "ffmpeg"
 _NATIVE_TYPES = {"video/mp4", "video/webm", "video/ogg"}
 _NATIVE_EXTS  = {".mp4", ".webm", ".m4v", ".ogv"}
 
-TMDB_API_KEY    = os.getenv("TMDB_API_KEY", "")
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w300"
 _TMDB_SEARCH    = "https://api.themoviedb.org/3/search/{kind}?api_key={key}&query={q}&language=en-US&page=1"
 _EXT_RE         = re.compile(r'\.(mkv|mp4|avi|mov|wmv|flv|webm|m4v|ts|m2ts)$', re.I)
@@ -31,23 +30,25 @@ def _clean_title(name: str) -> str:
 
 
 async def _fetch_tmdb_poster(session: aiohttp.ClientSession, title: str, ftype: str) -> str:
-    if not TMDB_API_KEY or not title:
+    key = os.getenv("TMDB_API_KEY", "")
+    if not key or not title:
         return ""
     clean = _clean_title(title)
     if not clean:
         return ""
     kind = "tv" if ftype == "series" else "movie"
-    url  = _TMDB_SEARCH.format(kind=kind, key=TMDB_API_KEY, q=quote(clean))
+    url  = _TMDB_SEARCH.format(kind=kind, key=key, q=quote(clean))
     try:
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
             if resp.status != 200:
+                logger.warning(f"TMDB {resp.status} for '{clean}'")
                 return ""
             data = await resp.json()
             results = data.get("results", [])
             if results and results[0].get("poster_path"):
                 return TMDB_IMAGE_BASE + results[0]["poster_path"]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"TMDB fetch error for '{clean}': {e}")
     return ""
 
 
@@ -80,14 +81,16 @@ def _auth(request) -> dict | None:
 
 
 async def serve_app(request):
-    return web.FileResponse(STATIC_DIR / "index.html")
+    return web.FileResponse(STATIC_DIR / "index.html",
+                            headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 async def serve_static(request):
     filename = request.match_info["filename"]
     filepath = STATIC_DIR / filename
     if filepath.exists() and filepath.is_file():
-        return web.FileResponse(filepath)
+        return web.FileResponse(filepath,
+                                headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     raise web.HTTPNotFound()
 
 
@@ -188,7 +191,7 @@ async def get_films(request):
     offset = (page - 1) * limit
     films  = all_films[offset: offset + limit]
 
-    if TMDB_API_KEY and films:
+    if os.getenv("TMDB_API_KEY", "") and films:
         async with aiohttp.ClientSession() as session:
             posters = await asyncio.gather(*[
                 _fetch_tmdb_poster(session, f.get("title") or f.get("name", ""), f["type"])
