@@ -182,8 +182,7 @@ async def get_films(request):
         except Exception as e:
             logger.error(f"series db error: {e}")
 
-    if query:
-        films.sort(key=_natural_sort_key)
+    films.sort(key=_natural_sort_key)
 
     return web.json_response({"films": films, "page": page})
 
