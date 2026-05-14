@@ -191,15 +191,20 @@ async def get_films(request):
     offset = (page - 1) * limit
     films  = all_films[offset: offset + limit]
 
-    if os.getenv("TMDB_API_KEY", "") and films:
+    tmdb_key = os.getenv("TMDB_API_KEY", "")
+    logger.info(f"TMDB key present: {bool(tmdb_key)}, films count: {len(films)}")
+    if tmdb_key and films:
         async with aiohttp.ClientSession() as session:
             posters = await asyncio.gather(*[
                 _fetch_tmdb_poster(session, f.get("title") or f.get("name", ""), f["type"])
                 for f in films
             ])
+        found = sum(1 for p in posters if p)
+        logger.info(f"TMDB posters found: {found}/{len(films)}")
         for film, poster in zip(films, posters):
             film["poster_url"] = poster
     else:
+        logger.warning("TMDB key missing or no films — skipping poster fetch")
         for film in films:
             film["poster_url"] = ""
 
