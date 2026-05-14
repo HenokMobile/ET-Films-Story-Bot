@@ -8,6 +8,11 @@ API_ID = os.getenv("TELEGRAM_API_ID", "0")
 API_HASH = os.getenv("TELEGRAM_API_HASH", "")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
+try:
+    _API_ID_INT = int(API_ID)
+except (ValueError, TypeError):
+    _API_ID_INT = 0
+
 CHUNK_SIZE = 512 * 1024  # 512 KB per request
 
 _client = None
@@ -16,8 +21,8 @@ _client_lock = asyncio.Lock()
 
 async def start_client():
     global _client
-    if not API_ID or API_ID == "0" or not API_HASH or not BOT_TOKEN:
-        logger.warning("⚠️  Telethon credentials not set — streaming disabled")
+    if not _API_ID_INT or not API_HASH or not BOT_TOKEN:
+        logger.warning("⚠️  Telethon credentials not set or invalid — streaming disabled")
         return
 
     try:
@@ -27,7 +32,7 @@ async def start_client():
                 return
             _client = TelegramClient(
                 "bot_stream",
-                int(API_ID),
+                _API_ID_INT,
                 API_HASH,
                 connection_retries=3,
                 retry_delay=2,
