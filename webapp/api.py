@@ -376,10 +376,117 @@ async def stream_film(request):
         return await _stream_direct(request, file_info, file_name)
 
 
+async def stream_start(request):
+    """GET /api/stream/start/{film_id}
+    Returns {type:'direct'|'hls', url, session_id?}.
+    Blocks until HLS segments are ready (for non-MP4).
+    """
+    user = _auth(request)
+    if not user:
+        raise web.HTTPUnauthorized()
+
+    film_id = request.match_info["film_id"]
+    parts   = film_id.split("_", 1)
+    if len(parts) != 2:
+        raise web.HTTPBadRequest()
+
+    film_type, db_id_str = parts
+    try:
+        db_id = int(db_id_str)
+    except ValueError:
+        raise web.HTTPBadRequest()
+
+    if film_type == "single":
+        db_path, table = SINGLE_DB, "single_movies"
+    elif film_type == "series":
+        db_path, table = SERIES_DB, "series"
+    else:
+        raise web.HTTPBadRequest()
+
+    try:
+        with sqlite3.connect(db_path) as conn:
+            row = conn.execute(
+                f"SELECT channel_id, message_id, file_name FROM {table} WHERE id = ?",
+                (db_id,),
+            ).fetchone()
+    except Exception as e:
+        logger.error(f"stream_start db error: {e}")
+        raise web.HTTPInternalServerError()
+
+    if not row:
+        raise web.HTTPNotFound()
+
+    channel_id, message_id, file_name = row
+    file_info = await get_file_info(channel_id, message_id)
+    if not file_info:
+        raise web.HTTPServiceUnavailable(text="Telethon unavailable")
+
+    mime_type = file_info["mime_type"]
+
+    if not _needs_transcode(mime_type, file_name):
+        init_data = (
+            request.headers.get("X-Init-Data")
+            or request.query.get("initData", "")
+        )
+        direct_url = f"/stream/{film_id}?initData={init_data}"
+        return web.json_response({"type": "direct", "url": direct_url})
+
+    from webapp import hls_manager
+    session_id = await hls_manager.start_session(file_info, file_name)
+    if not session_id:
+        raise web.HTTPInternalServerError(text="HLS session failed")
+
+    return web.json_response({
+        "type":       "hls",
+        "session_id": session_id,
+        "url":        f"/hls/{session_id}/playlist.m3u8",
+    })
+
+
+async def serve_hls_playlist(request):
+    """GET /hls/{session_id}/playlist.m3u8"""
+    session_id = request.match_info["session_id"]
+    from webapp import hls_manager
+    path = hls_manager.get_file_path(session_id, "playlist.m3u8")
+    if not path:
+        raise web.HTTPNotFound()
+    return web.FileResponse(
+        path,
+        headers={"Content-Type": "application/vnd.apple.mpegurl",
+                 "Cache-Control": "no-cache"}
+    )
+
+
+async def serve_hls_segment(request):
+    """GET /hls/{session_id}/{segment}"""
+    session_id = request.match_info["session_id"]
+    seg        = request.match_info["segment"]
+    from webapp import hls_manager
+    path = hls_manager.get_file_path(session_id, seg)
+    if not path:
+        # Segment not yet written — wait up to 8 s
+        from webapp import hls_manager as hm
+        for _ in range(16):
+            await asyncio.sleep(0.5)
+            path = hm.get_file_path(session_id, seg)
+            if path:
+                break
+    if not path:
+        raise web.HTTPNotFound()
+    return web.FileResponse(
+        path,
+        headers={"Content-Type": "video/mp2t",
+                 "Cache-Control": "no-cache"}
+    )
+
+
 def setup_webapp_routes(app: web.Application):
     app.router.add_get("/webapp", serve_app)
     app.router.add_get("/webapp/", serve_app)
     app.router.add_get("/webapp/static/{filename}", serve_static)
     app.router.add_get("/api/me", get_me)
     app.router.add_get("/api/films", get_films)
+    app.router.add_get("/api/stream/start/{film_id}", stream_start)
     app.router.add_get("/stream/{film_id}", stream_film)
+    app.router.add_get("/hls/{session_id}/playlist.m3u8", serve_hls_playlist)
+    app.router.add_get("/hls/{session_id}/{segment}", serve_hls_segment)

@@ -208,80 +208,122 @@ function makeCard(f) {
 
 /* ── PLAYER ──────────────────────────────────── */
 let _currentStreamUrl = '';
+let _hlsInstance = null;
 
-function openPlayer(filmId, title) {
-  _currentStreamUrl = `/stream/${filmId}?initData=${encodeURIComponent(initData)}`;
-  document.getElementById('pl-title').textContent = title;
-  document.getElementById('pl-fname').textContent = title;
-
+function _playerReset() {
   const vid    = document.getElementById('vid');
   const load   = document.getElementById('vid-loading');
   const errDiv = document.getElementById('vid-error');
   const tapDiv = document.getElementById('vid-tap');
-
-  /* reset state */
+  /* destroy previous HLS instance */
+  if (_hlsInstance) { _hlsInstance.destroy(); _hlsInstance = null; }
+  /* reset video element */
+  vid.pause();
+  vid.removeAttribute('src');
+  vid.load();
+  vid.oncanplay = null; vid.onerror = null; vid.onstalled = null;
+  vid.onplaying = null; vid.onwaiting = null;
+  /* reset overlay states */
   vid.classList.add('hidden');
   load.classList.remove('hidden');
   errDiv.classList.add('hidden');
   tapDiv.classList.add('hidden');
+  return { vid, load, errDiv, tapDiv };
+}
 
-  /* remove old listeners to avoid stacking */
-  vid.oncanplay = null; vid.onerror = null; vid.onstalled = null; vid.onplaying = null;
-
+function _attachVideoEvents(vid, load, errDiv, tapDiv) {
   vid.oncanplay = () => {
     load.classList.add('hidden');
-    tapDiv.classList.remove('hidden');   /* show tap hint */
+    tapDiv.classList.remove('hidden');
     vid.classList.remove('hidden');
-    /* try autoplay — works when inside user-gesture chain */
-    vid.play().then(() => {
-      tapDiv.classList.add('hidden');    /* autoplay succeeded, hide hint */
-    }).catch(() => {
-      /* autoplay blocked → hint remains, user taps controls */
-    });
+    vid.play().then(() => tapDiv.classList.add('hidden')).catch(() => {});
   };
-
   vid.onplaying = () => {
     load.classList.add('hidden');
     tapDiv.classList.add('hidden');
     vid.classList.remove('hidden');
   };
-
   vid.onstalled = vid.onwaiting = () => {
     if (!vid.error) load.classList.remove('hidden');
   };
-
   vid.onerror = () => {
     load.classList.add('hidden');
     tapDiv.classList.add('hidden');
     errDiv.classList.remove('hidden');
     vid.classList.add('hidden');
   };
+}
 
-  vid.src = _currentStreamUrl;
+async function openPlayer(filmId, title) {
+  document.getElementById('pl-title').textContent = title;
+  document.getElementById('pl-fname').textContent = title;
   document.getElementById('player').classList.remove('hidden');
 
-  if (tg?.BackButton) {
-    tg.BackButton.show();
-    tg.BackButton.onClick(closePlayer);
+  if (tg?.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(closePlayer); }
+
+  const { vid, load, errDiv, tapDiv } = _playerReset();
+
+  /* Ask server: direct MP4 stream or HLS transcoding? */
+  let info;
+  try {
+    const qs = new URLSearchParams({ initData });
+    /* Show a "preparing" message while server starts HLS (can take ~5-10s) */
+    const statusTxt = load.querySelector('.vid-status-txt');
+    if (statusTxt) statusTxt.textContent = 'ፊልም እያዘጋጀን ነው…';
+    const r = await fetch(
+      `/api/stream/start/${filmId}?${qs}`,
+      { headers: { 'X-Init-Data': initData } }
+    );
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    info = await r.json();
+    if (statusTxt) statusTxt.textContent = 'ፊልም እየጫናን ነው…';
+  } catch (e) {
+    load.classList.add('hidden');
+    errDiv.classList.remove('hidden');
+    return;
+  }
+
+  _currentStreamUrl = info.url;
+  _attachVideoEvents(vid, load, errDiv, tapDiv);
+
+  if (info.type === 'hls') {
+    /* HLS path — use hls.js (required on Android Chrome) */
+    if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+      const hls = new Hls({
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        lowLatencyMode: false,
+      });
+      _hlsInstance = hls;
+      hls.loadSource(info.url);
+      hls.attachMedia(vid);
+      hls.on(Hls.Events.ERROR, (_e, data) => {
+        if (data.fatal) {
+          load.classList.add('hidden');
+          errDiv.classList.remove('hidden');
+          vid.classList.add('hidden');
+        }
+      });
+    } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
+      /* Native HLS (Safari iOS) */
+      vid.src = info.url;
+    } else {
+      errDiv.classList.remove('hidden');
+      load.classList.add('hidden');
+    }
+  } else {
+    /* Direct MP4 — native <video> with byte-range seeking */
+    vid.src = info.url;
   }
 }
 
 function closePlayer() {
-  const vid = document.getElementById('vid');
-  vid.pause();
-  vid.removeAttribute('src');
-  vid.load();
+  _playerReset();
   document.getElementById('player').classList.add('hidden');
-  /* reset overlays */
-  document.getElementById('vid-loading').classList.remove('hidden');
-  document.getElementById('vid-error').classList.add('hidden');
-  document.getElementById('vid-tap').classList.add('hidden');
-  vid.classList.add('hidden');
   if (tg?.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(closePlayer); }
 }
 
 function downloadFilm() {
-  /* open raw stream URL in new tab — Telegram will download it */
   if (_currentStreamUrl) window.open(_currentStreamUrl, '_blank');
 }
 
