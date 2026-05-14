@@ -201,20 +201,16 @@ function makeCard(f) {
   const div = document.createElement('div');
   div.className = 'card';
 
-  const icon = f.type === 'series' ? '📺' : '🎬';
-  const bc   = f.type === 'series' ? 'badge-e' : 'badge-s';
-  const bl   = f.type === 'series' ? 'ተከታታይ' : 'ነጠላ ፊልም';
-  const sz   = fmtSize(f.size);
+  const sz = fmtSize(f.size);
 
   let title = (f.name || f.title || 'ፊልም').replace(/@\w+/g, '').replace(/\s+/g, ' ').trim();
   if (title.length > 90) title = title.slice(0, 90) + '…';
 
   div.innerHTML = `
-    <div class="card-thumb">${icon}</div>
+    <div class="card-thumb">🎬</div>
     <div class="card-body">
       <div class="card-title">${esc(title)}</div>
       <div class="card-meta">
-        <span class="badge ${bc}">${bl}</span>
         ${sz ? `<span class="card-size">${sz}</span>` : ''}
       </div>
     </div>
