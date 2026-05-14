@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-  <meta name="theme-color" content="#0a0a0f">
+  <meta name="theme-color" content="#090910">
   <title>ET Films</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
@@ -14,9 +14,14 @@
 <!-- SPLASH -->
 <div id="splash">
   <div class="splash-inner">
-    <div class="splash-icon">🎬</div>
+    <div class="splash-logo-ring">🎬</div>
     <div class="splash-title">ET Films</div>
     <div class="splash-sub">እየጫናን ነው...</div>
+    <div class="splash-dots">
+      <div class="splash-dot"></div>
+      <div class="splash-dot"></div>
+      <div class="splash-dot"></div>
+    </div>
   </div>
 </div>
 
@@ -25,7 +30,10 @@
 
   <!-- Header -->
   <header>
-    <span class="app-logo">🎬 ET Films</span>
+    <div class="app-logo">
+      <div class="logo-icon">🎬</div>
+      <span class="logo-text">ET Films</span>
+    </div>
     <span id="bal-pill" class="balance-pill hidden"><span id="bal-num">0</span> ብር</span>
   </header>
 
@@ -36,13 +44,36 @@
     <div id="pg-home" class="page active">
       <div class="scroll">
         <div class="hero">
-          <h2>🎬 ፊልሞች</h2>
-          <p>አዲስ ፊልሞች ይከታተሉ</p>
+          <div class="hero-glow"></div>
+          <h2>ፊልሞች 🎬</h2>
+          <p>ምርጥ Ethiopian & World ፊልሞች</p>
+          <div id="hero-stats" class="hero-stats hidden">
+            <div class="hstat">
+              <div class="hstat-num" id="hs-single">—</div>
+              <div class="hstat-lbl">ነጠላ ፊልሞች</div>
+            </div>
+            <div class="hstat">
+              <div class="hstat-num" id="hs-series">—</div>
+              <div class="hstat-lbl">ተከታታዮች</div>
+            </div>
+            <div class="hstat">
+              <div class="hstat-num" id="hs-total">—</div>
+              <div class="hstat-lbl">ድምር</div>
+            </div>
+          </div>
         </div>
+
+        <div class="tabs">
+          <button class="tab active" onclick="setFilter('all',this)">🎞 ሁሉም</button>
+          <button class="tab" onclick="setFilter('single',this)">🎬 ነጠላ</button>
+          <button class="tab" onclick="setFilter('series',this)">📺 ተከታታይ</button>
+        </div>
+
+        <div class="section-label">ፊልሞች</div>
         <div id="grid" class="grid">
           <div class="spinner-wrap"><div class="spinner"></div><p>ፊልሞች እየጫናን ነው...</p></div>
         </div>
-        <button id="load-more" class="load-more hidden" onclick="loadMore()">ተጨማሪ ፊልሞች</button>
+        <button id="load-more" class="load-more hidden" onclick="loadMore()">ተጨማሪ ፊልሞች ➕</button>
       </div>
     </div>
 
@@ -52,14 +83,18 @@
         <div class="search-wrap">
           <div class="search-box">
             <span class="s-icon">🔍</span>
-            <input id="s-input" type="text" placeholder="ፊልም ስም ያስገቡ..." autocomplete="off">
+            <input id="s-input" type="text" placeholder="ፊልም ስም ያስገቡ..." autocomplete="off" autocorrect="off">
             <button id="s-clear" class="s-clear hidden" onclick="clearSearch()">✕</button>
           </div>
         </div>
+        <div class="section-label" id="s-label" style="display:none">ውጤቶች</div>
         <div id="s-results" class="grid">
-          <div class="search-ph"><span>🎞</span><p>ፊልም ስም ያስገቡ</p></div>
+          <div class="search-ph">
+            <span>🎞</span>
+            <p>ፊልም ስም ያስገቡ ለመፈለግ</p>
+          </div>
         </div>
-        <button id="s-load-more" class="load-more hidden" onclick="searchLoadMore()">ተጨማሪ ፊልሞች</button>
+        <button id="s-load-more" class="load-more hidden" onclick="searchLoadMore()">ተጨማሪ ፊልሞች ➕</button>
       </div>
     </div>
 
@@ -67,34 +102,50 @@
     <div id="pg-profile" class="page">
       <div class="scroll">
         <div class="prof-head">
-          <div class="avatar"><span id="av-init">?</span></div>
+          <div class="prof-bg-glow"></div>
+          <div class="avatar"><span id="av-init">👤</span></div>
           <div class="prof-name" id="p-name">...</div>
           <div class="prof-uname" id="p-uname"></div>
         </div>
 
+        <div id="prof-stats" class="prof-stats hidden">
+          <div class="pstat">
+            <div class="pstat-val" id="ps-bal">0</div>
+            <div class="pstat-lbl">💰 ቀር ሂሳብ</div>
+          </div>
+          <div class="pstat">
+            <div class="pstat-val" id="ps-refs">0</div>
+            <div class="pstat-lbl">🎁 ጋበዛ</div>
+          </div>
+          <div class="pstat">
+            <div class="pstat-val" id="ps-earn">0</div>
+            <div class="pstat-lbl">💎 ገቢ</div>
+          </div>
+        </div>
+
         <div class="info-list">
           <div class="info-row gold">
-            <span class="info-icon">💰</span>
+            <div class="info-icon">💰</div>
             <div><div class="info-lbl">ቀር ሂሳብ</div><div class="info-val" id="p-bal">0 ብር</div></div>
           </div>
           <div class="info-row">
-            <span class="info-icon">📱</span>
+            <div class="info-icon">📱</div>
             <div><div class="info-lbl">ስልክ ቁጥር</div><div class="info-val" id="p-phone">—</div></div>
           </div>
           <div class="info-row">
-            <span class="info-icon">🎁</span>
+            <div class="info-icon">🎁</div>
             <div><div class="info-lbl">የጋበዙ ሰዎች</div><div class="info-val" id="p-refs">0 ሰዎች</div></div>
           </div>
           <div class="info-row">
-            <span class="info-icon">💎</span>
+            <div class="info-icon">💎</div>
             <div><div class="info-lbl">ከጋበዛ የተገኘ ብር</div><div class="info-val" id="p-earn">0 ብር</div></div>
           </div>
           <div class="info-row">
-            <span class="info-icon">📅</span>
+            <div class="info-icon">📅</div>
             <div><div class="info-lbl">የተቀላቀሉበት ቀን</div><div class="info-val" id="p-date">—</div></div>
           </div>
           <div class="info-row">
-            <span class="info-icon">🆔</span>
+            <div class="info-icon">🆔</div>
             <div><div class="info-lbl">Telegram ID</div><div class="info-val" id="p-id">—</div></div>
           </div>
         </div>
@@ -109,13 +160,19 @@
   <!-- Bottom Nav -->
   <nav class="nav">
     <button class="nb active" id="nb-home" onclick="showPage('home',this)">
-      <span class="nb-icon">🏠</span><span class="nb-lbl">ዋና ገፅ</span>
+      <span class="nb-icon">🏠</span>
+      <span class="nb-lbl">ዋና ገፅ</span>
+      <span class="nb-dot"></span>
     </button>
     <button class="nb" id="nb-search" onclick="showPage('search',this)">
-      <span class="nb-icon">🔍</span><span class="nb-lbl">ፍለጋ</span>
+      <span class="nb-icon">🔍</span>
+      <span class="nb-lbl">ፍለጋ</span>
+      <span class="nb-dot"></span>
     </button>
     <button class="nb" id="nb-profile" onclick="showPage('profile',this)">
-      <span class="nb-icon">👤</span><span class="nb-lbl">መገለጫ</span>
+      <span class="nb-icon">👤</span>
+      <span class="nb-lbl">መገለጫ</span>
+      <span class="nb-dot"></span>
     </button>
   </nav>
 </div>
@@ -127,19 +184,16 @@
     <div class="player-ttl" id="pl-title">ፊልም</div>
   </div>
   <div class="player-body">
-    <!-- Loading overlay -->
     <div id="vid-loading" class="vid-overlay">
       <div class="spinner lg"></div>
       <p class="vid-status-txt">ፊልም እየጫናን ነው…</p>
     </div>
-    <!-- Error overlay -->
     <div id="vid-error" class="vid-overlay hidden">
       <div class="vid-err-icon">⚠️</div>
       <p class="vid-status-txt">ፊልሙ ይህ መሣሪያ ላይ ሊጫወት አልቻለም</p>
       <small class="vid-err-sub">ፎርማቱ ተስማሚ ላይሆን ይችላል</small>
       <button class="dl-btn" id="dl-btn" onclick="downloadFilm()">⬇ ወደ Telegram ያውርዱ</button>
     </div>
-    <!-- Play tap hint (shown after canplay, before first tap) -->
     <div id="vid-tap" class="vid-overlay vid-tap hidden">
       <div class="play-big">▶</div>
       <p class="vid-status-txt">ለማጫወት ይጫኑ</p>
