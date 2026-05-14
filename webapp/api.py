@@ -18,13 +18,35 @@ _NATIVE_EXTS  = {".mp4", ".webm", ".m4v", ".ogv"}
 
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w300"
 _TMDB_SEARCH    = "https://api.themoviedb.org/3/search/{kind}?api_key={key}&query={q}&language=en-US&page=1"
-_EXT_RE         = re.compile(r'\.(mkv|mp4|avi|mov|wmv|flv|webm|m4v|ts|m2ts)$', re.I)
-_JUNK_RE        = re.compile(r'@\w+|[\[\(]\d{4}[\]\)]|\b(1080p|720p|480p|4k|hdr|bluray|webrip|hdtv|x264|x265|hevc|aac|ac3)\b', re.I)
+_EXT_RE      = re.compile(r'\.(mkv|mp4|avi|mov|wmv|flv|webm|m4v|ts|m2ts)$', re.I)
+_AMHARIC_RE  = re.compile(r'[\u1200-\u137F\u1380-\u139F\u2D80-\u2DDF\uAB01-\uAB2F]+')
+_CHANNEL_RE  = re.compile(r'@\w+')
+_QUALITY_RE  = re.compile(r'\b(1080p|720p|480p|4k|hdr|bluray|webrip|hdtv|x264|x265|hevc|aac|ac3|phonofilm)\b|HD\+?', re.I)
+_YEAR_RE     = re.compile(r'[\[\(]?\b(19|20)\d{2}\b[\]\)]?')
+_EP_RE       = re.compile(r'\s+\d+\s*[A-Za-z]?\s*$')
+_PAREN_RE    = re.compile(r'[\(\[].*?[\)\]]')
+_UNDER_RE    = re.compile(r'[_]+')
+_LEAD_NUM_RE = re.compile(r'^\d{1,3}\.')   # strip leading "01." "02." only (not "12 Monkeys")
+_DOT_SEP_RE  = re.compile(r'(?<=[a-zA-Z0-9])\.(?=[a-zA-Z])')  # dot-as-separator
+_UUID_RE     = re.compile(r'^[0-9a-f\-]{20,}$', re.I)
+_URL_ENC_RE  = re.compile(r'^%[0-9A-Fa-f]{2}')
 
 
-def _clean_title(name: str) -> str:
-    t = _EXT_RE.sub('', name or '')
-    t = _JUNK_RE.sub('', t)
+def _clean_title(name: str, strip_episode: bool = False) -> str:
+    t = _EXT_RE.sub('', name or '').strip()
+    # Skip garbage: UUIDs, URL-encoded strings, hashtag-only names
+    if _UUID_RE.match(t) or _URL_ENC_RE.match(t) or t.startswith('#'):
+        return ''
+    t = _CHANNEL_RE.sub('', t)        # remove @channel BEFORE underscore expansion
+    t = _UNDER_RE.sub(' ', t)         # underscores → spaces
+    t = _AMHARIC_RE.sub('', t)
+    t = _QUALITY_RE.sub('', t)
+    t = _PAREN_RE.sub('', t)
+    t = _YEAR_RE.sub('', t)
+    t = _LEAD_NUM_RE.sub('', t)       # "01.Home" → "Home" (before dot expansion)
+    t = _DOT_SEP_RE.sub(' ', t)       # "Home.alone" → "Home alone"
+    if strip_episode:
+        t = _EP_RE.sub('', t)
     t = re.sub(r'\s+', ' ', t).strip(' .-_')
     return t
 
@@ -33,7 +55,7 @@ async def _fetch_tmdb_poster(session: aiohttp.ClientSession, title: str, ftype: 
     key = os.getenv("TMDB_API_KEY", "")
     if not key or not title:
         return ""
-    clean = _clean_title(title)
+    clean = _clean_title(title, strip_episode=(ftype == "series"))
     if not clean:
         return ""
     kind = "tv" if ftype == "series" else "movie"
@@ -192,11 +214,10 @@ async def get_films(request):
     films  = all_films[offset: offset + limit]
 
     tmdb_key = os.getenv("TMDB_API_KEY", "")
-    logger.info(f"TMDB key present: {bool(tmdb_key)}, films count: {len(films)}")
     if tmdb_key and films:
         async with aiohttp.ClientSession() as session:
             posters = await asyncio.gather(*[
-                _fetch_tmdb_poster(session, f.get("title") or f.get("name", ""), f["type"])
+                _fetch_tmdb_poster(session, f.get("name", ""), f["type"])
                 for f in films
             ])
         found = sum(1 for p in posters if p)
@@ -204,7 +225,6 @@ async def get_films(request):
         for film, poster in zip(films, posters):
             film["poster_url"] = poster
     else:
-        logger.warning("TMDB key missing or no films — skipping poster fetch")
         for film in films:
             film["poster_url"] = ""
 
