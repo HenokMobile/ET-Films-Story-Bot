@@ -130,7 +130,24 @@
     <div class="player-ttl" id="pl-title">ፊልም</div>
   </div>
   <div class="player-body">
-    <video id="vid" controls playsinline preload="metadata"></video>
+    <!-- Loading overlay -->
+    <div id="vid-loading" class="vid-overlay">
+      <div class="spinner lg"></div>
+      <p class="vid-status-txt">ፊልም እየጫናን ነው…</p>
+    </div>
+    <!-- Error overlay -->
+    <div id="vid-error" class="vid-overlay hidden">
+      <div class="vid-err-icon">⚠️</div>
+      <p class="vid-status-txt">ፊልሙ ይህ መሣሪያ ላይ ሊጫወት አልቻለም</p>
+      <small class="vid-err-sub">ፎርማቱ ተስማሚ ላይሆን ይችላል</small>
+      <button class="dl-btn" id="dl-btn" onclick="downloadFilm()">⬇ ወደ Telegram ያውርዱ</button>
+    </div>
+    <!-- Play tap hint (shown after canplay, before first tap) -->
+    <div id="vid-tap" class="vid-overlay vid-tap hidden">
+      <div class="play-big">▶</div>
+      <p class="vid-status-txt">ለማጫወት ይጫኑ</p>
+    </div>
+    <video id="vid" controls playsinline preload="auto"></video>
   </div>
   <div class="player-foot">
     <div class="player-fname" id="pl-fname"></div>

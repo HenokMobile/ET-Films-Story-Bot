@@ -207,20 +207,63 @@ function makeCard(f) {
 }
 
 /* ── PLAYER ──────────────────────────────────── */
+let _currentStreamUrl = '';
+
 function openPlayer(filmId, title) {
-  const url = `/stream/${filmId}?initData=${encodeURIComponent(initData)}`;
+  _currentStreamUrl = `/stream/${filmId}?initData=${encodeURIComponent(initData)}`;
   document.getElementById('pl-title').textContent = title;
   document.getElementById('pl-fname').textContent = title;
 
-  const vid = document.getElementById('vid');
-  vid.src = url;
+  const vid    = document.getElementById('vid');
+  const load   = document.getElementById('vid-loading');
+  const errDiv = document.getElementById('vid-error');
+  const tapDiv = document.getElementById('vid-tap');
+
+  /* reset state */
+  vid.classList.add('hidden');
+  load.classList.remove('hidden');
+  errDiv.classList.add('hidden');
+  tapDiv.classList.add('hidden');
+
+  /* remove old listeners to avoid stacking */
+  vid.oncanplay = null; vid.onerror = null; vid.onstalled = null; vid.onplaying = null;
+
+  vid.oncanplay = () => {
+    load.classList.add('hidden');
+    tapDiv.classList.remove('hidden');   /* show tap hint */
+    vid.classList.remove('hidden');
+    /* try autoplay — works when inside user-gesture chain */
+    vid.play().then(() => {
+      tapDiv.classList.add('hidden');    /* autoplay succeeded, hide hint */
+    }).catch(() => {
+      /* autoplay blocked → hint remains, user taps controls */
+    });
+  };
+
+  vid.onplaying = () => {
+    load.classList.add('hidden');
+    tapDiv.classList.add('hidden');
+    vid.classList.remove('hidden');
+  };
+
+  vid.onstalled = vid.onwaiting = () => {
+    if (!vid.error) load.classList.remove('hidden');
+  };
+
+  vid.onerror = () => {
+    load.classList.add('hidden');
+    tapDiv.classList.add('hidden');
+    errDiv.classList.remove('hidden');
+    vid.classList.add('hidden');
+  };
+
+  vid.src = _currentStreamUrl;
   document.getElementById('player').classList.remove('hidden');
 
   if (tg?.BackButton) {
     tg.BackButton.show();
     tg.BackButton.onClick(closePlayer);
   }
-  vid.play().catch(() => {});
 }
 
 function closePlayer() {
@@ -229,7 +272,17 @@ function closePlayer() {
   vid.removeAttribute('src');
   vid.load();
   document.getElementById('player').classList.add('hidden');
+  /* reset overlays */
+  document.getElementById('vid-loading').classList.remove('hidden');
+  document.getElementById('vid-error').classList.add('hidden');
+  document.getElementById('vid-tap').classList.add('hidden');
+  vid.classList.add('hidden');
   if (tg?.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(closePlayer); }
+}
+
+function downloadFilm() {
+  /* open raw stream URL in new tab — Telegram will download it */
+  if (_currentStreamUrl) window.open(_currentStreamUrl, '_blank');
 }
 
 /* ── HELPERS ─────────────────────────────────── */
