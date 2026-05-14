@@ -188,7 +188,7 @@ function makeCard(f) {
   const bl   = f.type === 'series' ? 'ተከታታይ' : 'ነጠላ ፊልም';
   const sz   = fmtSize(f.size);
 
-  let title = (f.title || f.name || 'ፊልም').replace(/@\w+/g, '').replace(/\s+/g, ' ').trim();
+  let title = (f.name || f.title || 'ፊልም').replace(/@\w+/g, '').replace(/\s+/g, ' ').trim();
   if (title.length > 90) title = title.slice(0, 90) + '…';
 
   div.innerHTML = `
