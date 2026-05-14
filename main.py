@@ -29,9 +29,9 @@ async def run_health_server():
 
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 8080)
+    site = web.TCPSite(runner, "0.0.0.0", 5000)
     await site.start()
-    logger.info("✅ Server running on port 8080 (health + mini-app)")
+    logger.info("✅ Server running on port 5000 (health + mini-app)")
 
 
 async def run_telethon():

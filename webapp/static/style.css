@@ -255,6 +255,15 @@ header{
 }
 .player-fname{font-size:11px;color:rgba(255,255,255,.45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+/* ── NOT-IN-TELEGRAM NOTICE ──────────────────── */
+.not-tg-notice{
+  text-align:center;padding:56px 24px;
+}
+.ntg-icon{font-size:64px;margin-bottom:20px;line-height:1}
+.not-tg-notice h3{font-size:20px;font-weight:700;margin-bottom:10px}
+.not-tg-notice p{color:var(--text2);font-size:14px;margin-bottom:6px}
+.ntg-sub{color:var(--text3)!important;font-size:13px!important}
+
 /* ── ANIMATIONS ──────────────────────────────── */
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}

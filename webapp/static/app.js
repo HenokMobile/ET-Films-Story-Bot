@@ -41,6 +41,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     debounce = setTimeout(() => doSearch(v.trim()), 420);
   });
 
+  /* If not in Telegram, show a friendly notice */
+  const inTelegram = !!(tg && tg.initData);
+  if (!inTelegram) {
+    showNoTelegramNotice();
+    showApp();
+    return;
+  }
+
   await Promise.all([loadProfile(), loadFilms(true)]);
   showApp();
 });
@@ -52,6 +60,18 @@ function showApp() {
     sp.style.display = 'none';
     document.getElementById('app').classList.remove('hidden');
   }, 480);
+}
+
+/* ── NOT-IN-TELEGRAM NOTICE ──────────────────── */
+function showNoTelegramNotice() {
+  const grid = document.getElementById('grid');
+  if (grid) grid.innerHTML = `
+    <div class="not-tg-notice">
+      <div class="ntg-icon">📱</div>
+      <h3>Telegram ውስጥ ይክፈቱ</h3>
+      <p>ይህ Mini App ከ Telegram Bot ውስጥ ብቻ ይሰራል።</p>
+      <p class="ntg-sub">Bot ላይ ሄደው <strong>🎬 ET Films</strong> button ይጫኑ።</p>
+    </div>`;
 }
 
 /* ── NAVIGATION ──────────────────────────────── */

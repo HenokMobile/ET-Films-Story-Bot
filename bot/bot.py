@@ -1544,6 +1544,22 @@ async def send_startup_notifications(application):
             parse_mode='Markdown'
         )
 
+        # Set Mini App menu button for all users
+        try:
+            from telegram import MenuButtonWebApp, WebAppInfo as WAI
+            _domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
+            if _domain:
+                _webapp_url = f"https://{_domain}/webapp/"
+                await application.bot.set_chat_menu_button(
+                    menu_button=MenuButtonWebApp(
+                        text="🎬 ET Films",
+                        web_app=WAI(url=_webapp_url)
+                    )
+                )
+                logger.info(f"✅ Mini App menu button set: {_webapp_url}")
+        except Exception as me:
+            logger.warning(f"Menu button setup skipped: {me}")
+
         logger.info("✅ Bot started - admin notified, no user notifications sent")
 
     except Exception as e:
