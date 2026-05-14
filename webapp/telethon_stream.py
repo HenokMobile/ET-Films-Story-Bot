@@ -4,8 +4,8 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
-API_ID = os.getenv("TELEGRAM_API_ID", "0")
-API_HASH = os.getenv("TELEGRAM_API_HASH", "")
+API_ID = os.getenv("API_ID", "0")
+API_HASH = os.getenv("API_HASH", "")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
 try:

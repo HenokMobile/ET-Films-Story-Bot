@@ -343,7 +343,7 @@ async def stream_film(request):
     file_info = await get_file_info(channel_id, message_id)
     if not file_info:
         raise web.HTTPServiceUnavailable(
-            text="Streaming unavailable. Please set TELEGRAM_API_ID and TELEGRAM_API_HASH."
+            text="Streaming unavailable. Please set API_ID and API_HASH."
         )
 
     mime_type = file_info["mime_type"]
