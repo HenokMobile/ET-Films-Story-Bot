@@ -248,10 +248,12 @@ function makeTile(f) {
   let title = (f.name || f.title || 'ፊልም').replace(/@\w+/g, '').replace(/\s+/g, ' ').trim();
   if (title.length > 60) title = title.slice(0, 60) + '…';
 
+  const holes = Array(5).fill('<div class="film-hole"></div>').join('');
   div.innerHTML = `
     <div class="tile-thumb">
-      🎬
-      <div class="tile-play-icon">▶</div>
+      <div class="film-strip-top">${holes}</div>
+      <div class="tile-play-center"><div class="tile-play-arrow"></div></div>
+      <div class="film-strip-bot">${holes}</div>
     </div>
     <div class="tile-body">
       <div class="tile-title">${esc(title)}</div>
