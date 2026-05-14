@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import sqlite3
 import logging
@@ -13,6 +14,11 @@ from webapp.telethon_stream import get_file_info, iter_file_chunks
 FFMPEG = "ffmpeg"
 _NATIVE_TYPES = {"video/mp4", "video/webm", "video/ogg"}
 _NATIVE_EXTS  = {".mp4", ".webm", ".m4v", ".ogv"}
+
+
+def _natural_sort_key(film: dict) -> list:
+    return [int(c) if c.isdigit() else c.lower()
+            for c in re.split(r'(\d+)', film.get("name") or "")]
 
 
 def _needs_transcode(mime: str, fname: str) -> bool:
@@ -175,6 +181,9 @@ async def get_films(request):
                 )
         except Exception as e:
             logger.error(f"series db error: {e}")
+
+    if query:
+        films.sort(key=_natural_sort_key)
 
     return web.json_response({"films": films, "page": page})
 
