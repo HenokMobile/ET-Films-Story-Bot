@@ -104,7 +104,7 @@ async def get_films(request):
 
     query = request.query.get("q", "").strip()
     page  = max(1, int(request.query.get("page", 1)))
-    limit = 20
+    limit = 21
     cap   = 5000
 
     all_films = []

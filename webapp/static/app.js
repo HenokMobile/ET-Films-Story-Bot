@@ -167,7 +167,7 @@ async function loadFilms(reset) {
     }
 
     d.films.forEach(f => grid.appendChild(makeTile(f)));
-    document.getElementById('load-more').classList.toggle('hidden', d.films.length < 20);
+    document.getElementById('load-more').classList.toggle('hidden', d.films.length < 21);
     page++;
   } catch (e) {
     console.error('films:', e);
@@ -230,7 +230,7 @@ async function _fetchSearch(reset) {
     d.films.forEach(f => grid.appendChild(makeTile(f)));
     const count = d.total || d.films.length;
     document.getElementById('section-count').textContent = count + ' ፊልሞች';
-    btn.classList.toggle('hidden', d.films.length < 20);
+    btn.classList.toggle('hidden', d.films.length < 21);
     searchPage++;
   } catch {
     if (reset) grid.innerHTML = '<div class="search-ph"><span>⚠️</span><p>ስህተት ተፈጠረ</p></div>';
