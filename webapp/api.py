@@ -61,6 +61,18 @@ def _clean_title(name: str, strip_episode: bool = False) -> str:
     return t
 
 
+def _poster_match(query: str, result_title: str) -> bool:
+    """Word-level Jaccard > 0.5 with abbreviation normalisation (K.G.F → KGF)."""
+    def _words(s: str):
+        s = re.sub(r'\b([A-Za-z])\.', r'\1', s)      # K.G.F. → KGF
+        s = re.sub(r'[^a-z0-9 ]', ' ', s.lower())
+        return set(s.split())
+    q, r = _words(query), _words(result_title)
+    if not q or not r:
+        return False
+    return len(q & r) / len(q | r) > 0.5
+
+
 async def _fetch_tmdb_poster(session: aiohttp.ClientSession, title: str, ftype: str) -> str:
     key = os.getenv("TMDB_API_KEY", "")
     if not key or not title:
@@ -77,8 +89,13 @@ async def _fetch_tmdb_poster(session: aiohttp.ClientSession, title: str, ftype: 
                 return ""
             data = await resp.json()
             results = data.get("results", [])
-            if results and results[0].get("poster_path"):
-                return TMDB_IMAGE_BASE + results[0]["poster_path"]
+            if results:
+                hit = results[0]
+                result_title = hit.get("title") or hit.get("name") or ""
+                if hit.get("poster_path") and _poster_match(clean, result_title):
+                    return TMDB_IMAGE_BASE + hit["poster_path"]
+                else:
+                    logger.info(f"TMDB poster rejected: '{clean}' vs '{result_title}'")
     except Exception as e:
         logger.warning(f"TMDB fetch error for '{clean}': {e}")
     return ""
