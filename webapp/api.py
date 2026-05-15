@@ -86,10 +86,18 @@ async def _fetch_tmdb_poster(session: aiohttp.ClientSession, title: str, ftype: 
                 return ""
             data = await resp.json()
             results = data.get("results", [])
+            query_words = clean.lower().split()
+            single_word = len(query_words) == 1
             # Take the first result with a poster — TMDB already ranks by relevance
             for hit in results:
                 if hit.get("poster_path"):
-                    result_title = hit.get("title") or hit.get("name") or ""
+                    result_title = (hit.get("title") or hit.get("name") or "").strip()
+                    result_lower = result_title.lower()
+                    # Guard: single-word query must match result title exactly
+                    # (prevents "CRISIS" → "Classroom Crisis")
+                    if single_word and result_lower != query_words[0]:
+                        logger.info(f"TMDB skipped (single-word mismatch): '{clean}' ≠ '{result_title}'")
+                        continue
                     logger.info(f"TMDB poster found: '{clean}' → '{result_title}'")
                     return TMDB_IMAGE_BASE + hit["poster_path"]
             if results:
@@ -582,7 +590,19 @@ async def tmdb_detail(request):
                 results = data.get("results", [])
                 if not results:
                     return web.json_response({})
-                hit     = results[0]
+                # Single-word guard: prevent "CRISIS" → "Classroom Crisis" mismatches
+                query_words = clean.lower().split()
+                if len(query_words) == 1:
+                    matched = next(
+                        (r for r in results
+                         if (r.get("title") or r.get("name") or "").lower().strip() == query_words[0]),
+                        None
+                    )
+                    if not matched:
+                        return web.json_response({})
+                    hit = matched
+                else:
+                    hit = results[0]
                 tmdb_id = hit.get("id")
 
             detail_url = (
