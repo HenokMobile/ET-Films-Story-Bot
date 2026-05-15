@@ -114,6 +114,25 @@
   <button class="drawer-close" onclick="closeProfile()">✕ ዝጋ</button>
 </div>
 
+<!-- FILM DETAIL -->
+<div id="detail-overlay" class="detail-overlay hidden" onclick="closeDetail()"></div>
+<div id="detail-drawer" class="detail-drawer hidden">
+  <div class="detail-poster-wrap">
+    <img id="detail-poster" class="detail-poster" src="" alt="">
+    <div class="detail-poster-fade"></div>
+    <button class="detail-back-btn" onclick="closeDetail()">← ተመለስ</button>
+    <div id="detail-no-poster" class="detail-no-poster hidden">🎬</div>
+  </div>
+  <div class="detail-body">
+    <div class="detail-badge" id="detail-badge">ፊልም</div>
+    <div class="detail-title" id="detail-title">ፊልም</div>
+    <div class="detail-meta" id="detail-meta"></div>
+    <button class="detail-play-btn" id="detail-play-btn">
+      <span class="detail-play-icon">▶</span> ፊልሙን ይጫወቱ
+    </button>
+  </div>
+</div>
+
 <!-- VIDEO PLAYER -->
 <div id="player" class="player hidden">
   <div class="player-top">

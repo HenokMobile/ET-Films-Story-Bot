@@ -239,7 +239,7 @@ async function _fetchSearch(reset) {
   }
 }
 
-/* ── TILE BUILDER (3-col grid) ───────────────── */
+/* ── TILE BUILDER (2-col grid) ───────────────── */
 function makeTile(f) {
   const div = document.createElement('div');
   div.className = 'film-tile';
@@ -264,8 +264,63 @@ function makeTile(f) {
       ${sz ? `<div class="tile-size">${sz}</div>` : ''}
     </div>`;
 
-  div.onclick = () => openPlayer(f.id, title);
+  div.onclick = () => openDetail(f, title);
   return div;
+}
+
+/* ── FILM DETAIL DRAWER ──────────────────────── */
+let _detailFilm = null;
+
+function openDetail(f, title) {
+  _detailFilm = f;
+
+  // Poster
+  const poster    = document.getElementById('detail-poster');
+  const noPoster  = document.getElementById('detail-no-poster');
+  if (f.poster_url) {
+    poster.src = f.poster_url;
+    poster.classList.remove('hidden');
+    noPoster.classList.add('hidden');
+    poster.onerror = () => { poster.classList.add('hidden'); noPoster.classList.remove('hidden'); };
+  } else {
+    poster.src = '';
+    poster.classList.add('hidden');
+    noPoster.classList.remove('hidden');
+  }
+
+  // Badge (series or movie)
+  const badge = document.getElementById('detail-badge');
+  badge.textContent = f.type === 'series' ? '📺 ድራማ' : '🎬 ፊልም';
+
+  // Title
+  document.getElementById('detail-title').textContent = title;
+
+  // Meta: size + type
+  const sz = fmtSize(f.size);
+  const meta = document.getElementById('detail-meta');
+  meta.innerHTML = [
+    sz ? `<span>📦 ${sz}</span>` : '',
+    f.type === 'series' ? '<span>📺 ተከታታይ ድራማ</span>' : '<span>🎥 ነጠላ ፊልም</span>',
+  ].filter(Boolean).join('<span style="opacity:.3">·</span>');
+
+  // Play button
+  document.getElementById('detail-play-btn').onclick = () => {
+    closeDetail();
+    openPlayer(f.id, title);
+  };
+
+  // Show drawer
+  document.getElementById('detail-overlay').classList.remove('hidden');
+  document.getElementById('detail-drawer').classList.remove('hidden');
+
+  if (tg?.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(closeDetail); }
+}
+
+function closeDetail() {
+  document.getElementById('detail-overlay').classList.add('hidden');
+  document.getElementById('detail-drawer').classList.add('hidden');
+  _detailFilm = null;
+  if (tg?.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(closeDetail); }
 }
 
 /* ── PLAYER ──────────────────────────────────── */
