@@ -62,10 +62,10 @@ def _clean_title(name: str, strip_episode: bool = False) -> str:
     t = _YEAR_RE.sub('', t)
     t = _LEAD_NUM_RE.sub('', t)       # "01.Home" → "Home" (before dot expansion)
     t = _DOT_SEP_RE.sub(' ', t)       # "Home.alone" → "Home alone"
+    t = _STUCK_NUM_RE.sub(r'\1 \2', t)   # "Again13" → "Again 13" FIRST (so EP_RE can strip)
     t = _LEAD_EP_RE.sub('', t)        # "1A CRISIS" → "CRISIS" (leading ep marker)
     if strip_episode:
-        t = _EP_RE.sub('', t)
-    t = _STUCK_NUM_RE.sub(r'\1 \2', t)   # "KGF1" → "KGF 1"
+        t = _EP_RE.sub('', t)         # "18 Again 13" → "18 Again"
     t = re.sub(r'\s+', ' ', t).strip(' .-_')
     return t
 
