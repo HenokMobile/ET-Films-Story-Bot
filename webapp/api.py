@@ -30,6 +30,11 @@ _LEAD_NUM_RE = re.compile(r'^0\d\.')   # strip ONLY leading-zero indices: "01." 
 _DOT_SEP_RE  = re.compile(r'(?<=[a-zA-Z0-9])\.(?=[a-zA-Z])')  # dot-as-separator
 _UUID_RE     = re.compile(r'^[0-9a-f\-]{20,}$', re.I)
 _URL_ENC_RE  = re.compile(r'^%[0-9A-Fa-f]{2}')
+# Remove emojis and misc symbols: ★ ✔️ ☆ ✓ etc.
+# NOTE: emoji above U+FFFF need \U (8-digit) not \u (4-digit)
+_SYMBOL_RE   = re.compile('[\u2600-\u27BF\u2B00-\u2BFF\U0001F000-\U0001FFFF\uFE00-\uFE0F\u200D\uFFFD]+')
+# "KGF1" → "KGF 1"  (letter stuck to trailing digit with no space)
+_STUCK_NUM_RE = re.compile(r'([a-zA-Z])(\d+)$')
 
 
 def _clean_title(name: str, strip_episode: bool = False) -> str:
@@ -39,7 +44,8 @@ def _clean_title(name: str, strip_episode: bool = False) -> str:
         return ''
     t = _CHANNEL_RE.sub('', t)        # remove @channel BEFORE underscore expansion
     t = _UNDER_RE.sub(' ', t)         # underscores → spaces
-    t = _AMHARIC_RE.sub('', t)
+    t = _AMHARIC_RE.sub('', t)        # remove Amharic text
+    t = _SYMBOL_RE.sub('', t)         # remove ★ ✔️ emojis and misc symbols
     t = _QUALITY_RE.sub('', t)
     t = _PAREN_RE.sub('', t)
     t = _YEAR_RE.sub('', t)
@@ -47,6 +53,7 @@ def _clean_title(name: str, strip_episode: bool = False) -> str:
     t = _DOT_SEP_RE.sub(' ', t)       # "Home.alone" → "Home alone"
     if strip_episode:
         t = _EP_RE.sub('', t)
+    t = _STUCK_NUM_RE.sub(r'\1 \2', t)   # "KGF1" → "KGF 1"
     t = re.sub(r'\s+', ' ', t).strip(' .-_')
     return t
 
