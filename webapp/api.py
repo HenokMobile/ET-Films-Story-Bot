@@ -26,7 +26,7 @@ _YEAR_RE     = re.compile(r'[\[\(]?\b(19|20)\d{2}\b[\]\)]?')
 _EP_RE       = re.compile(r'\s+\d+\s*[A-Za-z]?\s*$')
 _PAREN_RE    = re.compile(r'[\(\[].*?[\)\]]')
 _UNDER_RE    = re.compile(r'[_]+')
-_LEAD_NUM_RE = re.compile(r'^\d{1,3}\.')   # strip leading "01." "02." only (not "12 Monkeys")
+_LEAD_NUM_RE = re.compile(r'^0\d\.')   # strip ONLY leading-zero indices: "01." "02." … "09." (not "12.", "13.")
 _DOT_SEP_RE  = re.compile(r'(?<=[a-zA-Z0-9])\.(?=[a-zA-Z])')  # dot-as-separator
 _UUID_RE     = re.compile(r'^[0-9a-f\-]{20,}$', re.I)
 _URL_ENC_RE  = re.compile(r'^%[0-9A-Fa-f]{2}')
