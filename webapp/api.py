@@ -39,14 +39,23 @@ _LEAD_EP_RE   = re.compile(r'^\d+[A-Za-z]\s+')
 _STUCK_NUM_RE = re.compile(r'([a-zA-Z])(\d+)$')
 
 
+def _is_amharic_only(text: str) -> bool:
+    """Returns True if the text contains only Amharic characters (no Latin letters or digits)."""
+    latin = re.sub(r'[\u1200-\u137F\u1380-\u139F\u2D80-\u2DDF\uAB01-\uAB2F\s]', '', text)
+    return len(latin.strip()) == 0
+
+
 def _clean_title(name: str, strip_episode: bool = False) -> str:
     t = _EXT_RE.sub('', name or '').strip()
     # Skip garbage: UUIDs, URL-encoded strings, hashtag-only names
     if _UUID_RE.match(t) or _URL_ENC_RE.match(t) or t.startswith('#'):
         return ''
+    # If title is purely Amharic with no Latin chars, skip TMDB search
+    if _is_amharic_only(t):
+        return ''
     t = _CHANNEL_RE.sub('', t)        # remove @channel BEFORE underscore expansion
     t = _UNDER_RE.sub(' ', t)         # underscores → spaces
-    t = _AMHARIC_RE.sub('', t)        # remove Amharic text
+    t = _AMHARIC_RE.sub('', t)        # remove Amharic text (keep Latin parts)
     t = _SYMBOL_RE.sub('', t)         # remove ★ ✔️ emojis and misc symbols
     t = _QUALITY_RE.sub('', t)
     t = _PAREN_RE.sub('', t)
@@ -62,15 +71,18 @@ def _clean_title(name: str, strip_episode: bool = False) -> str:
 
 
 def _poster_match(query: str, result_title: str) -> bool:
-    """Word-level Jaccard > 0.5 with abbreviation normalisation (K.G.F → KGF)."""
+    """Word-level Jaccard >= 0.4 with abbreviation normalisation (K.G.F → KGF).
+    Also accepts if all query words appear in the result title."""
     def _words(s: str):
         s = re.sub(r'\b([A-Za-z])\.', r'\1', s)      # K.G.F. → KGF
         s = re.sub(r'[^a-z0-9 ]', ' ', s.lower())
-        return set(s.split())
+        return set(w for w in s.split() if len(w) > 1)  # skip single chars
     q, r = _words(query), _words(result_title)
     if not q or not r:
         return False
-    return len(q & r) / len(q | r) > 0.5
+    jaccard = len(q & r) / len(q | r)
+    all_query_in_result = q.issubset(r)
+    return jaccard >= 0.4 or all_query_in_result
 
 
 async def _fetch_tmdb_poster(session: aiohttp.ClientSession, title: str, ftype: str) -> str:
@@ -83,19 +95,20 @@ async def _fetch_tmdb_poster(session: aiohttp.ClientSession, title: str, ftype: 
     kind = "tv" if ftype == "series" else "movie"
     url  = _TMDB_SEARCH.format(kind=kind, key=key, q=quote(clean))
     try:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
             if resp.status != 200:
                 logger.warning(f"TMDB {resp.status} for '{clean}'")
                 return ""
             data = await resp.json()
             results = data.get("results", [])
-            if results:
-                hit = results[0]
+            # Check ALL results, not just the first one
+            for hit in results:
                 result_title = hit.get("title") or hit.get("name") or ""
                 if hit.get("poster_path") and _poster_match(clean, result_title):
+                    logger.info(f"TMDB poster matched: '{clean}' → '{result_title}'")
                     return TMDB_IMAGE_BASE + hit["poster_path"]
-                else:
-                    logger.info(f"TMDB poster rejected: '{clean}' vs '{result_title}'")
+            if results:
+                logger.info(f"TMDB no match for '{clean}' among {len(results)} results")
     except Exception as e:
         logger.warning(f"TMDB fetch error for '{clean}': {e}")
     return ""
