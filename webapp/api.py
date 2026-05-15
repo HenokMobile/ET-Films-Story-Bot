@@ -16,7 +16,7 @@ FFMPEG = "ffmpeg"
 _NATIVE_TYPES = {"video/mp4", "video/webm", "video/ogg"}
 _NATIVE_EXTS  = {".mp4", ".webm", ".m4v", ".ogv"}
 
-TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w300"
+TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 _TMDB_SEARCH    = "https://api.themoviedb.org/3/search/{kind}?api_key={key}&query={q}&language=en-US&page=1"
 _EXT_RE      = re.compile(r'\.(mkv|mp4|avi|mov|wmv|flv|webm|m4v|ts|m2ts)$', re.I)
 _AMHARIC_RE  = re.compile(r'[\u1200-\u137F\u1380-\u139F\u2D80-\u2DDF\uAB01-\uAB2F]+')
