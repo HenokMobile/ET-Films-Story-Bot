@@ -33,6 +33,8 @@ _URL_ENC_RE  = re.compile(r'^%[0-9A-Fa-f]{2}')
 # Remove emojis and misc symbols: ★ ✔️ ☆ ✓ etc.
 # NOTE: emoji above U+FFFF need \U (8-digit) not \u (4-digit)
 _SYMBOL_RE   = re.compile('[\u2600-\u27BF\u2B00-\u2BFF\U0001F000-\U0001FFFF\uFE00-\uFE0F\u200D\uFFFD]+')
+# "1A CRISIS" → "CRISIS"  (leading episode marker: digit+letter+space)
+_LEAD_EP_RE   = re.compile(r'^\d+[A-Za-z]\s+')
 # "KGF1" → "KGF 1"  (letter stuck to trailing digit with no space)
 _STUCK_NUM_RE = re.compile(r'([a-zA-Z])(\d+)$')
 
@@ -51,6 +53,7 @@ def _clean_title(name: str, strip_episode: bool = False) -> str:
     t = _YEAR_RE.sub('', t)
     t = _LEAD_NUM_RE.sub('', t)       # "01.Home" → "Home" (before dot expansion)
     t = _DOT_SEP_RE.sub(' ', t)       # "Home.alone" → "Home alone"
+    t = _LEAD_EP_RE.sub('', t)        # "1A CRISIS" → "CRISIS" (leading ep marker)
     if strip_episode:
         t = _EP_RE.sub('', t)
     t = _STUCK_NUM_RE.sub(r'\1 \2', t)   # "KGF1" → "KGF 1"
