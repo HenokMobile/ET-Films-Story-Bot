@@ -18,6 +18,11 @@ _NATIVE_EXTS  = {".mp4", ".webm", ".m4v", ".ogv"}
 
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 _TMDB_SEARCH    = "https://api.themoviedb.org/3/search/{kind}?api_key={key}&query={q}&language=en-US&page=1"
+
+# In-memory cache: key "ftype:name" → (poster_url, popularity)
+# Survives for the lifetime of the process (cleared on restart)
+_tmdb_cache: dict = {}
+_TMDB_SEM   = None   # asyncio.Semaphore created lazily (needs running loop)
 _EXT_RE      = re.compile(r'\.(mkv|mp4|avi|mov|wmv|flv|webm|m4v|ts|m2ts)$', re.I)
 _AMHARIC_RE  = re.compile(r'[\u1200-\u137F\u1380-\u139F\u2D80-\u2DDF\uAB01-\uAB2F]+')
 _CHANNEL_RE  = re.compile(r'@\w+')
@@ -70,41 +75,62 @@ def _clean_title(name: str, strip_episode: bool = False) -> str:
     return t
 
 
-async def _fetch_tmdb_poster(session: aiohttp.ClientSession, title: str, ftype: str) -> str:
+async def _fetch_tmdb_data(session: aiohttp.ClientSession, title: str, ftype: str) -> tuple:
+    """Return (poster_url, popularity). Uses in-memory cache + semaphore rate-limiter."""
+    global _TMDB_SEM
+    if _TMDB_SEM is None:
+        _TMDB_SEM = asyncio.Semaphore(15)   # max 15 concurrent TMDB requests
+
+    cache_key = f"{ftype}:{title}"
+    if cache_key in _tmdb_cache:
+        return _tmdb_cache[cache_key]
+
     key = os.getenv("TMDB_API_KEY", "")
     if not key or not title:
-        return ""
+        return ("", 0.0)
+
     clean = _clean_title(title, strip_episode=(ftype == "series"))
     if not clean:
-        return ""
+        _tmdb_cache[cache_key] = ("", 0.0)
+        return ("", 0.0)
+
     kind = "tv" if ftype == "series" else "movie"
     url  = _TMDB_SEARCH.format(kind=kind, key=key, q=quote(clean))
+
+    result = ("", 0.0)
     try:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
-            if resp.status != 200:
-                logger.warning(f"TMDB {resp.status} for '{clean}'")
-                return ""
-            data = await resp.json()
-            results = data.get("results", [])
-            query_words = clean.lower().split()
-            single_word = len(query_words) == 1
-            # Take the first result with a poster — TMDB already ranks by relevance
-            for hit in results:
-                if hit.get("poster_path"):
-                    result_title = (hit.get("title") or hit.get("name") or "").strip()
-                    result_lower = result_title.lower()
-                    # Guard: single-word query must match result title exactly
-                    # (prevents "CRISIS" → "Classroom Crisis")
-                    if single_word and result_lower != query_words[0]:
-                        logger.info(f"TMDB skipped (single-word mismatch): '{clean}' ≠ '{result_title}'")
-                        continue
-                    logger.info(f"TMDB poster found: '{clean}' → '{result_title}'")
-                    return TMDB_IMAGE_BASE + hit["poster_path"]
-            if results:
-                logger.info(f"TMDB no poster available for '{clean}'")
+        async with _TMDB_SEM:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status != 200:
+                    logger.warning(f"TMDB {resp.status} for '{clean}'")
+                else:
+                    data = await resp.json()
+                    results = data.get("results", [])
+                    query_words = clean.lower().split()
+                    single_word = len(query_words) == 1
+                    for hit in results:
+                        if hit.get("poster_path"):
+                            result_title = (hit.get("title") or hit.get("name") or "").strip()
+                            result_lower = result_title.lower()
+                            if single_word and result_lower != query_words[0]:
+                                logger.info(f"TMDB skipped (single-word mismatch): '{clean}' ≠ '{result_title}'")
+                                continue
+                            poster     = TMDB_IMAGE_BASE + hit["poster_path"]
+                            popularity = float(hit.get("popularity", 0))
+                            result     = (poster, popularity)
+                            logger.info(f"TMDB found: '{clean}' → '{result_title}' pop={popularity:.1f}")
+                            break
     except Exception as e:
         logger.warning(f"TMDB fetch error for '{clean}': {e}")
-    return ""
+
+    _tmdb_cache[cache_key] = result
+    return result
+
+
+# Keep thin wrapper for backward compat (detail endpoint still uses session directly)
+async def _fetch_tmdb_poster(session: aiohttp.ClientSession, title: str, ftype: str) -> str:
+    poster, _ = await _fetch_tmdb_data(session, title, ftype)
+    return poster
 
 
 def _natural_sort_key(film: dict) -> list:
@@ -241,25 +267,43 @@ async def get_films(request):
         except Exception as e:
             logger.error(f"{ftype} db error: {e}")
 
-    all_films.sort(key=_natural_sort_key)
+    tmdb_key = os.getenv("TMDB_API_KEY", "")
 
+    if tmdb_key and all_films:
+        # ── Fetch TMDB data for ALL films before sorting ─────────────────
+        # Cached entries return instantly; new ones go through the semaphore.
+        async with aiohttp.ClientSession() as session:
+            tmdb_results = await asyncio.gather(*[
+                _fetch_tmdb_data(session, f.get("name", ""), f["type"])
+                for f in all_films
+            ])
+
+        for film, (poster, popularity) in zip(all_films, tmdb_results):
+            film["poster_url"]  = poster
+            film["_popularity"] = popularity
+
+        # Sort: TMDB-matched films by popularity desc, unmatched at end (A-Z)
+        matched   = [f for f in all_films if f["_popularity"] > 0]
+        unmatched = [f for f in all_films if f["_popularity"] == 0]
+        matched.sort(key=lambda f: f["_popularity"], reverse=True)
+        unmatched.sort(key=_natural_sort_key)
+        all_films = matched + unmatched
+
+        found = sum(1 for f in all_films if f.get("poster_url"))
+        logger.info(f"TMDB posters found: {found}/{len(all_films)} — sorted by popularity")
+    else:
+        all_films.sort(key=_natural_sort_key)
+        for film in all_films:
+            film["poster_url"]  = ""
+            film["_popularity"] = 0
+
+    # Paginate after sorting
     offset = (page - 1) * limit
     films  = all_films[offset: offset + limit]
 
-    tmdb_key = os.getenv("TMDB_API_KEY", "")
-    if tmdb_key and films:
-        async with aiohttp.ClientSession() as session:
-            posters = await asyncio.gather(*[
-                _fetch_tmdb_poster(session, f.get("name", ""), f["type"])
-                for f in films
-            ])
-        found = sum(1 for p in posters if p)
-        logger.info(f"TMDB posters found: {found}/{len(films)}")
-        for film, poster in zip(films, posters):
-            film["poster_url"] = poster
-    else:
-        for film in films:
-            film["poster_url"] = ""
+    # Strip internal field before sending
+    for f in films:
+        f.pop("_popularity", None)
 
     return web.json_response({"films": films, "page": page})
 
