@@ -307,13 +307,16 @@ async function openDetail(f, title) {
   dotsEl.innerHTML = '';
   _carouselIdx = 0;
 
-  const images = (tmdb.images && tmdb.images.length) ? tmdb.images
-               : f.poster_url ? [f.poster_url] : [];
-  _carouselLen = images.length;
+  // backdrops (w780 URLs) are landscape; original-size images from posters are portrait
+  const rawImages = (tmdb.images && tmdb.images.length) ? tmdb.images
+                  : f.poster_url ? [f.poster_url] : [];
+  _carouselLen = rawImages.length;
 
-  images.forEach((src, i) => {
+  rawImages.forEach((src, i) => {
+    // heuristic: w780 = backdrop (landscape), /original/ without w780 = poster (portrait)
+    const isPortrait = src.includes('/original/') && !src.includes('/w780');
     const slide = document.createElement('div');
-    slide.className = 'carousel-slide';
+    slide.className = 'carousel-slide' + (isPortrait ? ' portrait' : '');
     slide.innerHTML = `<img src="${esc(src)}" loading="${i === 0 ? 'eager' : 'lazy'}" alt=""><div class="carousel-slide-fade"></div>`;
     track.appendChild(slide);
 
@@ -346,6 +349,12 @@ async function openDetail(f, title) {
     const rt = h ? `${h}ሰ ${m}ደ` : `${m}ደ`;
     statParts.push(`<div class="stat-pill">⏱ ${rt}</div>`);
   }
+  // Film type pill (series / movie) — prefer TMDB's confirmed kind
+  const kindLabel = f.type === 'series' ? '📺 ተከታታይ' : '🎬 ነጠላ ፊልም';
+  statParts.push(`<div class="stat-pill">${kindLabel}</div>`);
+  // Country of origin
+  if (tmdb.country) statParts.push(`<div class="stat-pill">🌍 ${esc(tmdb.country)}</div>`);
+  // File size
   const sz = fmtSize(f.size);
   if (sz) statParts.push(`<div class="stat-pill">📦 ${sz}</div>`);
   stats.innerHTML = statParts.join('');

@@ -617,17 +617,30 @@ async def tmdb_detail(request):
         year      = (detail.get("release_date") or detail.get("first_air_date") or "")[:4]
         overview  = detail.get("overview") or ""
 
+        # Country of origin
+        prod_countries = detail.get("production_countries", [])
+        orig_countries = detail.get("origin_country", [])
+        countries = [c.get("name", "") for c in prod_countries if c.get("name")]
+        if not countries and orig_countries:
+            countries = orig_countries[:2]
+        country = ", ".join(countries[:2]) if countries else ""
+
+        # Content kind (movie vs series) for UI display
+        content_kind = "TV Series" if kind == "tv" else "Movie"
+
         return web.json_response({
-            "tmdb_title":  detail.get("title") or detail.get("name") or clean,
-            "overview":    overview,
-            "rating":      round(rating, 1) if rating else None,
-            "year":        year,
-            "runtime":     runtime,
-            "genres":      genres,
-            "cast":        cast,
-            "directors":   directors,
-            "images":      all_images,
-            "poster":      (IMG_BASE_OR + detail["poster_path"]) if detail.get("poster_path") else "",
+            "tmdb_title":    detail.get("title") or detail.get("name") or clean,
+            "overview":      overview,
+            "rating":        round(rating, 1) if rating else None,
+            "year":          year,
+            "runtime":       runtime,
+            "genres":        genres,
+            "cast":          cast,
+            "directors":     directors,
+            "images":        all_images,
+            "poster":        (IMG_BASE_OR + detail["poster_path"]) if detail.get("poster_path") else "",
+            "country":       country,
+            "content_kind":  content_kind,
         })
     except Exception as e:
         logger.warning(f"tmdb_detail error: {e}")
