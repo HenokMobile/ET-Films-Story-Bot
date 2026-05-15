@@ -70,21 +70,6 @@ def _clean_title(name: str, strip_episode: bool = False) -> str:
     return t
 
 
-def _poster_match(query: str, result_title: str) -> bool:
-    """Word-level Jaccard >= 0.4 with abbreviation normalisation (K.G.F → KGF).
-    Also accepts if all query words appear in the result title."""
-    def _words(s: str):
-        s = re.sub(r'\b([A-Za-z])\.', r'\1', s)      # K.G.F. → KGF
-        s = re.sub(r'[^a-z0-9 ]', ' ', s.lower())
-        return set(w for w in s.split() if len(w) > 1)  # skip single chars
-    q, r = _words(query), _words(result_title)
-    if not q or not r:
-        return False
-    jaccard = len(q & r) / len(q | r)
-    all_query_in_result = q.issubset(r)
-    return jaccard >= 0.4 or all_query_in_result
-
-
 async def _fetch_tmdb_poster(session: aiohttp.ClientSession, title: str, ftype: str) -> str:
     key = os.getenv("TMDB_API_KEY", "")
     if not key or not title:
@@ -101,14 +86,14 @@ async def _fetch_tmdb_poster(session: aiohttp.ClientSession, title: str, ftype: 
                 return ""
             data = await resp.json()
             results = data.get("results", [])
-            # Check ALL results, not just the first one
+            # Take the first result with a poster — TMDB already ranks by relevance
             for hit in results:
-                result_title = hit.get("title") or hit.get("name") or ""
-                if hit.get("poster_path") and _poster_match(clean, result_title):
-                    logger.info(f"TMDB poster matched: '{clean}' → '{result_title}'")
+                if hit.get("poster_path"):
+                    result_title = hit.get("title") or hit.get("name") or ""
+                    logger.info(f"TMDB poster found: '{clean}' → '{result_title}'")
                     return TMDB_IMAGE_BASE + hit["poster_path"]
             if results:
-                logger.info(f"TMDB no match for '{clean}' among {len(results)} results")
+                logger.info(f"TMDB no poster available for '{clean}'")
     except Exception as e:
         logger.warning(f"TMDB fetch error for '{clean}': {e}")
     return ""
