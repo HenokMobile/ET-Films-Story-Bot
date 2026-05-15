@@ -114,23 +114,72 @@
   <button class="drawer-close" onclick="closeProfile()">✕ ዝጋ</button>
 </div>
 
-<!-- FILM DETAIL -->
-<div id="detail-overlay" class="detail-overlay hidden" onclick="closeDetail()"></div>
-<div id="detail-drawer" class="detail-drawer hidden">
-  <div class="detail-poster-wrap">
-    <img id="detail-poster" class="detail-poster" src="" alt="">
-    <div class="detail-poster-fade"></div>
-    <button class="detail-back-btn" onclick="closeDetail()">← ተመለስ</button>
-    <div id="detail-no-poster" class="detail-no-poster hidden">🎬</div>
+<!-- FILM DETAIL (full screen) -->
+<div id="detail-page" class="detail-page hidden">
+
+  <!-- Back button (fixed top-left) -->
+  <button class="detail-back-btn" onclick="closeDetail()">← ተመለስ</button>
+
+  <!-- Loading overlay -->
+  <div id="detail-loading" class="detail-loading">
+    <div class="spinner lg"></div>
+    <p style="color:rgba(255,255,255,.5);font-size:13px;margin-top:14px">መረጃ እየጫናን ነው...</p>
   </div>
-  <div class="detail-body">
-    <div class="detail-badge" id="detail-badge">ፊልም</div>
-    <div class="detail-title" id="detail-title">ፊልም</div>
-    <div class="detail-meta" id="detail-meta"></div>
+
+  <!-- Scrollable content -->
+  <div id="detail-scroll" class="detail-scroll hidden">
+
+    <!-- Image carousel -->
+    <div class="carousel-wrap">
+      <div id="carousel-track" class="carousel-track"></div>
+      <div id="carousel-dots" class="carousel-dots"></div>
+    </div>
+
+    <!-- Info section -->
+    <div class="detail-info">
+      <div class="detail-badge" id="detail-badge">ፊልም</div>
+      <h1 class="detail-title" id="detail-title"></h1>
+
+      <!-- Rating / year / runtime row -->
+      <div class="detail-stats" id="detail-stats"></div>
+
+      <!-- Genre tags -->
+      <div class="detail-genres" id="detail-genres"></div>
+
+      <!-- Overview -->
+      <div id="detail-overview-wrap" class="detail-section hidden">
+        <div class="detail-section-lbl">ስለ ፊልሙ</div>
+        <p class="detail-overview" id="detail-overview"></p>
+      </div>
+
+      <!-- Director -->
+      <div id="detail-director-wrap" class="detail-section hidden">
+        <div class="detail-section-lbl">ዳይሬክተር</div>
+        <p class="detail-crew" id="detail-director"></p>
+      </div>
+
+      <!-- Cast -->
+      <div id="detail-cast-wrap" class="detail-section hidden">
+        <div class="detail-section-lbl">ተዋናዮች</div>
+        <p class="detail-crew" id="detail-cast"></p>
+      </div>
+
+      <!-- File size -->
+      <div id="detail-size-wrap" class="detail-section hidden">
+        <div class="detail-section-lbl">የፋይል መጠን</div>
+        <p class="detail-crew" id="detail-size"></p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Sticky play button -->
+  <div class="detail-play-bar">
     <button class="detail-play-btn" id="detail-play-btn">
       <span class="detail-play-icon">▶</span> ፊልሙን ይጫወቱ
     </button>
   </div>
+
 </div>
 
 <!-- VIDEO PLAYER -->

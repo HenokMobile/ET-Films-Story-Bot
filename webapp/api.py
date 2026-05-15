@@ -558,12 +558,89 @@ async def serve_hls_segment(request):
     )
 
 
+async def tmdb_detail(request):
+    """Return full TMDB detail for a film: overview, rating, year, genres, cast, images."""
+    title = request.rel_url.query.get("title", "").strip()
+    ftype = request.rel_url.query.get("type", "movie")
+    key   = os.getenv("TMDB_API_KEY", "")
+    if not key or not title:
+        return web.json_response({})
+
+    clean = _clean_title(title, strip_episode=(ftype == "series"))
+    if not clean:
+        return web.json_response({})
+
+    kind = "tv" if ftype == "series" else "movie"
+    search_url = f"https://api.themoviedb.org/3/search/{kind}?api_key={key}&query={quote(clean)}&language=en-US&page=1"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(search_url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status != 200:
+                    return web.json_response({})
+                data    = await resp.json()
+                results = data.get("results", [])
+                if not results:
+                    return web.json_response({})
+                hit     = results[0]
+                tmdb_id = hit.get("id")
+
+            detail_url = (
+                f"https://api.themoviedb.org/3/{kind}/{tmdb_id}"
+                f"?api_key={key}&language=en-US&append_to_response=images,credits"
+                f"&include_image_language=en,null"
+            )
+            async with session.get(detail_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status != 200:
+                    return web.json_response({})
+                detail = await resp.json()
+
+        IMG_BASE_W  = "https://image.tmdb.org/t/p/w780"
+        IMG_BASE_OR = "https://image.tmdb.org/t/p/original"
+
+        images    = detail.get("images", {})
+        backdrops = [IMG_BASE_W + b["file_path"] for b in images.get("backdrops", [])[:6] if b.get("file_path")]
+        posters   = [IMG_BASE_OR + p["file_path"] for p in images.get("posters", [])[:4] if p.get("file_path")]
+
+        # Merge: backdrops first then portrait posters
+        all_images = backdrops + posters
+        if not all_images and detail.get("poster_path"):
+            all_images = [IMG_BASE_OR + detail["poster_path"]]
+
+        genres    = [g["name"] for g in detail.get("genres", [])]
+        credits   = detail.get("credits", {})
+        cast      = [c["name"] for c in credits.get("cast", [])[:6]]
+        directors = [c["name"] for c in credits.get("crew", []) if c.get("job") == "Director"][:2]
+
+        runtime   = detail.get("runtime") or (detail.get("episode_run_time") or [None])[0]
+        rating    = detail.get("vote_average")
+        year      = (detail.get("release_date") or detail.get("first_air_date") or "")[:4]
+        overview  = detail.get("overview") or ""
+
+        return web.json_response({
+            "tmdb_title":  detail.get("title") or detail.get("name") or clean,
+            "overview":    overview,
+            "rating":      round(rating, 1) if rating else None,
+            "year":        year,
+            "runtime":     runtime,
+            "genres":      genres,
+            "cast":        cast,
+            "directors":   directors,
+            "images":      all_images,
+            "poster":      (IMG_BASE_OR + detail["poster_path"]) if detail.get("poster_path") else "",
+        })
+    except Exception as e:
+        logger.warning(f"tmdb_detail error: {e}")
+        return web.json_response({})
+
+
 def setup_webapp_routes(app: web.Application):
     app.router.add_get("/webapp", serve_app)
     app.router.add_get("/webapp/", serve_app)
     app.router.add_get("/webapp/static/{filename}", serve_static)
     app.router.add_get("/api/me", get_me)
     app.router.add_get("/api/films", get_films)
+    app.router.add_get("/api/tmdb_detail", tmdb_detail)
     app.router.add_get("/api/stream/start/{film_id}", stream_start)
     app.router.add_get("/stream/{film_id}", stream_film)
     app.router.add_get("/hls/{session_id}/playlist.m3u8", serve_hls_playlist)

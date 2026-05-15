@@ -268,57 +268,134 @@ function makeTile(f) {
   return div;
 }
 
-/* ── FILM DETAIL DRAWER ──────────────────────── */
-let _detailFilm = null;
+/* ── FILM DETAIL FULL SCREEN ─────────────────── */
+let _detailFilm  = null;
+let _carouselIdx = 0;
+let _carouselLen = 0;
 
-function openDetail(f, title) {
+async function openDetail(f, title) {
   _detailFilm = f;
 
-  // Poster
-  const poster    = document.getElementById('detail-poster');
-  const noPoster  = document.getElementById('detail-no-poster');
-  if (f.poster_url) {
-    poster.src = f.poster_url;
-    poster.classList.remove('hidden');
-    noPoster.classList.add('hidden');
-    poster.onerror = () => { poster.classList.add('hidden'); noPoster.classList.remove('hidden'); };
-  } else {
-    poster.src = '';
-    poster.classList.add('hidden');
-    noPoster.classList.remove('hidden');
-  }
+  const page = document.getElementById('detail-page');
+  const loading = document.getElementById('detail-loading');
+  const scroll  = document.getElementById('detail-scroll');
 
-  // Badge (series or movie)
-  const badge = document.getElementById('detail-badge');
-  badge.textContent = f.type === 'series' ? '📺 ድራማ' : '🎬 ፊልም';
+  // Show full screen with spinner
+  page.classList.remove('hidden');
+  loading.classList.remove('hidden');
+  scroll.classList.add('hidden');
 
-  // Title
-  document.getElementById('detail-title').textContent = title;
+  if (tg?.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(closeDetail); }
 
-  // Meta: size + type
-  const sz = fmtSize(f.size);
-  const meta = document.getElementById('detail-meta');
-  meta.innerHTML = [
-    sz ? `<span>📦 ${sz}</span>` : '',
-    f.type === 'series' ? '<span>📺 ተከታታይ ድራማ</span>' : '<span>🎥 ነጠላ ፊልም</span>',
-  ].filter(Boolean).join('<span style="opacity:.3">·</span>');
-
-  // Play button
+  // Play button wired immediately
   document.getElementById('detail-play-btn').onclick = () => {
     closeDetail();
     openPlayer(f.id, title);
   };
 
-  // Show drawer
-  document.getElementById('detail-overlay').classList.remove('hidden');
-  document.getElementById('detail-drawer').classList.remove('hidden');
+  // Fetch TMDB detail
+  let tmdb = {};
+  try {
+    const qs = new URLSearchParams({ title: f.name || f.title || '', type: f.type || 'movie' });
+    tmdb = await fetch('/api/tmdb_detail?' + qs).then(r => r.json());
+  } catch (e) { console.warn('tmdb_detail:', e); }
 
-  if (tg?.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(closeDetail); }
+  // ── Carousel ──────────────────────────────────
+  const track = document.getElementById('carousel-track');
+  const dotsEl = document.getElementById('carousel-dots');
+  track.innerHTML = '';
+  dotsEl.innerHTML = '';
+  _carouselIdx = 0;
+
+  const images = (tmdb.images && tmdb.images.length) ? tmdb.images
+               : f.poster_url ? [f.poster_url] : [];
+  _carouselLen = images.length;
+
+  images.forEach((src, i) => {
+    const slide = document.createElement('div');
+    slide.className = 'carousel-slide';
+    slide.innerHTML = `<img src="${esc(src)}" loading="${i === 0 ? 'eager' : 'lazy'}" alt=""><div class="carousel-slide-fade"></div>`;
+    track.appendChild(slide);
+
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i === 0 ? ' active' : '');
+    dotsEl.appendChild(dot);
+  });
+
+  // Update dots on scroll
+  track.onscroll = () => {
+    const idx = Math.round(track.scrollLeft / track.clientWidth);
+    if (idx !== _carouselIdx) {
+      _carouselIdx = idx;
+      dotsEl.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+    }
+  };
+
+  // ── Info ──────────────────────────────────────
+  const displayTitle = tmdb.tmdb_title || title;
+  document.getElementById('detail-badge').textContent = f.type === 'series' ? '📺 ድራማ' : '🎬 ፊልም';
+  document.getElementById('detail-title').textContent = displayTitle;
+
+  // Stats row
+  const stats = document.getElementById('detail-stats');
+  const statParts = [];
+  if (tmdb.rating) statParts.push(`<div class="stat-pill gold">⭐ ${tmdb.rating}</div>`);
+  if (tmdb.year)   statParts.push(`<div class="stat-pill">📅 ${tmdb.year}</div>`);
+  if (tmdb.runtime) {
+    const h = Math.floor(tmdb.runtime / 60), m = tmdb.runtime % 60;
+    const rt = h ? `${h}ሰ ${m}ደ` : `${m}ደ`;
+    statParts.push(`<div class="stat-pill">⏱ ${rt}</div>`);
+  }
+  const sz = fmtSize(f.size);
+  if (sz) statParts.push(`<div class="stat-pill">📦 ${sz}</div>`);
+  stats.innerHTML = statParts.join('');
+
+  // Genres
+  const genresEl = document.getElementById('detail-genres');
+  genresEl.innerHTML = (tmdb.genres || []).map(g => `<span class="genre-tag">${esc(g)}</span>`).join('');
+
+  // Overview
+  const ovWrap = document.getElementById('detail-overview-wrap');
+  const ovEl   = document.getElementById('detail-overview');
+  if (tmdb.overview) {
+    ovEl.textContent = tmdb.overview;
+    ovWrap.classList.remove('hidden');
+  } else { ovWrap.classList.add('hidden'); }
+
+  // Director
+  const dirWrap = document.getElementById('detail-director-wrap');
+  const dirEl   = document.getElementById('detail-director');
+  if (tmdb.directors && tmdb.directors.length) {
+    dirEl.textContent = tmdb.directors.join(', ');
+    dirWrap.classList.remove('hidden');
+  } else { dirWrap.classList.add('hidden'); }
+
+  // Cast
+  const castWrap = document.getElementById('detail-cast-wrap');
+  const castEl   = document.getElementById('detail-cast');
+  if (tmdb.cast && tmdb.cast.length) {
+    castEl.textContent = tmdb.cast.join(', ');
+    castWrap.classList.remove('hidden');
+  } else { castWrap.classList.add('hidden'); }
+
+  // Size fallback section
+  const sizeWrap = document.getElementById('detail-size-wrap');
+  const sizeEl   = document.getElementById('detail-size');
+  if (sz && !statParts.find(s => s.includes('📦'))) {
+    sizeEl.textContent = sz;
+    sizeWrap.classList.remove('hidden');
+  } else { sizeWrap.classList.add('hidden'); }
+
+  // Show content
+  loading.classList.add('hidden');
+  scroll.classList.remove('hidden');
+  scroll.scrollTop = 0;
 }
 
 function closeDetail() {
-  document.getElementById('detail-overlay').classList.add('hidden');
-  document.getElementById('detail-drawer').classList.add('hidden');
+  document.getElementById('detail-page').classList.add('hidden');
+  document.getElementById('detail-scroll').classList.add('hidden');
+  document.getElementById('detail-loading').classList.remove('hidden');
   _detailFilm = null;
   if (tg?.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(closeDetail); }
 }
