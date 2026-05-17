@@ -50,6 +50,27 @@ _MAIN_KEYBOARD = _build_keyboard()
 def get_main_keyboard():
     return _MAIN_KEYBOARD
 
+def _is_streamable(file_name: str) -> bool:
+    """Returns True if the file can be played inline by Telegram (no download needed)."""
+    ext = (file_name or "").lower().rsplit(".", 1)[-1]
+    return ext in {"mp4", "m4v", "mov"}
+
+
+async def send_film(bot, chat_id: int, file_id: str, file_name: str):
+    """Send film as video (inline playback) for MP4/M4V, or as document for other formats."""
+    if _is_streamable(file_name):
+        try:
+            await bot.send_video(
+                chat_id=chat_id,
+                video=file_id,
+                supports_streaming=True,
+            )
+            return
+        except Exception:
+            pass
+    await bot.send_document(chat_id=chat_id, document=file_id)
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
     user = update.effective_user
@@ -664,10 +685,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     except Exception as e:
                         logger.error(f"Error deleting inline keyboard message: {e}")
 
-                    await context.bot.send_document(
-                        chat_id=query.message.chat.id,
-                        document=file_id
-                    )
+                    await send_film(context.bot, query.message.chat.id, file_id, file_name)
 
                     # Log download
                     db.log_download(user_id, file_id, film_type, file_name)
@@ -888,10 +906,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     except Exception as e:
                         logger.error(f"Error deleting inline keyboard message: {e}")
 
-                    await context.bot.send_document(
-                        chat_id=query.message.chat.id,
-                        document=file_id
-                    )
+                    await send_film(context.bot, query.message.chat.id, file_id, file_name)
 
                     # Log download
                     db.log_download(user_id, file_id, "movie", file_name)
@@ -969,10 +984,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     except Exception as e:
                         logger.error(f"Error deleting inline keyboard message: {e}")
 
-                    await context.bot.send_document(
-                        chat_id=query.message.chat.id,
-                        document=file_id
-                    )
+                    await send_film(context.bot, query.message.chat.id, file_id, file_name)
 
                     # Log download
                     db.log_download(user_id, file_id, "series", file_name)
