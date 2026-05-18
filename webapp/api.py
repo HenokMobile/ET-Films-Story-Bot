@@ -272,7 +272,6 @@ async def get_films(request):
 
     if tmdb_key and all_films:
         # ── Fetch TMDB data for ALL films before sorting ─────────────────
-        # Cached entries return instantly; new ones go through the semaphore.
         async with aiohttp.ClientSession() as session:
             tmdb_results = await asyncio.gather(*[
                 _fetch_tmdb_data(session, f.get("name", ""), f["type"])
@@ -283,22 +282,35 @@ async def get_films(request):
             film["poster_url"]  = poster
             film["_popularity"] = popularity
 
-        # Sort: TMDB-matched films by popularity desc, unmatched at end (A-Z)
-        matched   = [f for f in all_films if f["_popularity"] > 0]
-        unmatched = [f for f in all_films if f["_popularity"] == 0]
-        matched.sort(key=lambda f: f["_popularity"], reverse=True)
-        unmatched.sort(key=_natural_sort_key)
-        all_films = matched + unmatched
+        if query:
+            # Search: sort by popularity then name
+            matched   = [f for f in all_films if f["_popularity"] > 0]
+            unmatched = [f for f in all_films if f["_popularity"] == 0]
+            matched.sort(key=lambda f: f["_popularity"], reverse=True)
+            unmatched.sort(key=_natural_sort_key)
+            all_films = matched + unmatched
+        else:
+            # Home: shuffle daily so different films appear each day
+            import random as _rnd
+            day_seed = int(__import__("datetime").date.today().strftime("%Y%j"))
+            _rnd.seed(day_seed)
+            _rnd.shuffle(all_films)
 
         found = sum(1 for f in all_films if f.get("poster_url"))
-        logger.info(f"TMDB posters found: {found}/{len(all_films)} — sorted by popularity")
+        logger.info(f"TMDB posters: {found}/{len(all_films)}")
     else:
-        all_films.sort(key=_natural_sort_key)
+        if query:
+            all_films.sort(key=_natural_sort_key)
+        else:
+            import random as _rnd
+            day_seed = int(__import__("datetime").date.today().strftime("%Y%j"))
+            _rnd.seed(day_seed)
+            _rnd.shuffle(all_films)
         for film in all_films:
             film["poster_url"]  = ""
             film["_popularity"] = 0
 
-    # Paginate after sorting
+    # Paginate after ordering
     offset = (page - 1) * limit
     films  = all_films[offset: offset + limit]
 
