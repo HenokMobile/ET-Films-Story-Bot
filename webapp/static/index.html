@@ -19,6 +19,44 @@
   </div>
 </div>
 
+<!-- LOGIN PAGE -->
+<div id="login-page" class="hidden">
+
+  <div id="login-step-phone" class="login-step">
+    <div class="login-logo-wrap">
+      <img src="/webapp/static/logo.png" class="login-logo" alt="ET Films">
+    </div>
+    <h2 class="login-title">ET Films</h2>
+    <p class="login-sub">ለመቀጠል ስልክ ቁጥርዎን ያስገቡ</p>
+    <div class="login-form">
+      <div class="login-input-wrap">
+        <span class="login-input-icon">📱</span>
+        <input id="login-phone" type="tel" placeholder="09XXXXXXXX" autocomplete="tel" oninput="loginClearError('phone')">
+      </div>
+      <div id="login-phone-error" class="login-error hidden"></div>
+      <button class="login-btn" id="login-phone-btn" onclick="requestOtp()">ቀጥል →</button>
+    </div>
+    <p class="login-note">Bot ላይ የተመዘገቡበት ስልክ ቁጥር ያስገቡ</p>
+  </div>
+
+  <div id="login-step-otp" class="login-step hidden">
+    <button class="login-back-btn" onclick="showPhoneStep()">← ተመለስ</button>
+    <div class="otp-icon-wrap">💬</div>
+    <h2 class="login-title">OTP ኮድ</h2>
+    <p class="login-sub" id="otp-desc">ወደ Telegram ኮድ ተልኳል</p>
+    <div class="login-form">
+      <div class="login-input-wrap">
+        <span class="login-input-icon">🔢</span>
+        <input id="login-otp" type="number" placeholder="123456" autocomplete="one-time-code" oninput="loginClearError('otp')">
+      </div>
+      <div id="login-otp-error" class="login-error hidden"></div>
+      <button class="login-btn" id="login-otp-btn" onclick="verifyOtp()">ፀድቅ ✓</button>
+      <button class="login-resend-btn" onclick="requestOtp()">ኮዱን እንደገና ላክ</button>
+    </div>
+  </div>
+
+</div>
+
 <!-- APP -->
 <div id="app" class="hidden">
 

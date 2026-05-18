@@ -2,6 +2,8 @@
 
 const tg = window.Telegram?.WebApp;
 let initData = '';
+let webToken = localStorage.getItem('et_web_token') || '';
+let _loginPhone = '';
 let page = 1;
 let busy = false;
 let debounce = null;
@@ -39,8 +41,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   const inTelegram = !!(tg && tg.initData);
-  if (!inTelegram) {
-    showNoTelegramNotice();
+
+  if (!inTelegram && !webToken) {
+    showLoginPage();
     showApp();
     return;
   }
@@ -58,16 +61,94 @@ function showApp() {
   }, 480);
 }
 
-/* ── NOT-IN-TELEGRAM NOTICE ──────────────────── */
-function showNoTelegramNotice() {
-  const grid = document.getElementById('grid');
-  if (grid) grid.innerHTML = `
-    <div class="not-tg-notice">
-      <div class="ntg-icon">📱</div>
-      <h3>Telegram ውስጥ ይክፈቱ</h3>
-      <p>ይህ Mini App ከ Telegram Bot ውስጥ ብቻ ይሰራል።</p>
-      <p class="ntg-sub">Bot ላይ ሄደው <strong>🎬 ET Films</strong> button ይጫኑ።</p>
-    </div>`;
+/* ── LOGIN PAGE ──────────────────────────────── */
+function showLoginPage() {
+  document.getElementById('login-page').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+}
+
+function hideLoginPage() {
+  document.getElementById('login-page').classList.add('hidden');
+}
+
+function showPhoneStep() {
+  document.getElementById('login-step-phone').classList.remove('hidden');
+  document.getElementById('login-step-otp').classList.add('hidden');
+  loginClearError('phone');
+}
+
+function loginClearError(type) {
+  document.getElementById('login-' + type + '-error').classList.add('hidden');
+}
+
+function loginShowError(type, msg) {
+  const el = document.getElementById('login-' + type + '-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+function loginSetLoading(btnId, loading) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = loading;
+  if (btnId === 'login-phone-btn') btn.textContent = loading ? 'እየላክን...' : 'ቀጥል →';
+  if (btnId === 'login-otp-btn')   btn.textContent = loading ? 'እያረጋገጥን...' : 'ፀድቅ ✓';
+}
+
+async function requestOtp() {
+  const phone = document.getElementById('login-phone').value.trim();
+  if (!phone) { loginShowError('phone', 'ስልክ ቁጥር ያስገቡ'); return; }
+
+  loginSetLoading('login-phone-btn', true);
+  loginClearError('phone');
+
+  try {
+    const r = await fetch('/api/auth/request-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone }),
+    });
+    const d = await r.json();
+    if (!r.ok) { loginShowError('phone', d.error || 'ስህተት ተፈጠረ'); return; }
+
+    _loginPhone = phone;
+    document.getElementById('otp-desc').textContent = `${phone} — Telegram ላይ ኮድ ተልኳል`;
+    document.getElementById('login-step-phone').classList.add('hidden');
+    document.getElementById('login-step-otp').classList.remove('hidden');
+    document.getElementById('login-otp').value = '';
+    document.getElementById('login-otp').focus();
+  } catch (e) {
+    loginShowError('phone', 'ኔትወርክ ስህተት። እንደገና ይሞክሩ');
+  } finally {
+    loginSetLoading('login-phone-btn', false);
+  }
+}
+
+async function verifyOtp() {
+  const otp = document.getElementById('login-otp').value.trim();
+  if (!otp) { loginShowError('otp', 'ኮዱን ያስገቡ'); return; }
+
+  loginSetLoading('login-otp-btn', true);
+  loginClearError('otp');
+
+  try {
+    const r = await fetch('/api/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: _loginPhone, otp }),
+    });
+    const d = await r.json();
+    if (!r.ok) { loginShowError('otp', d.error || 'ስህተት ተፈጠረ'); return; }
+
+    webToken = d.token;
+    localStorage.setItem('et_web_token', webToken);
+    hideLoginPage();
+    await Promise.all([loadProfile(), loadFilms(true)]);
+    showApp();
+  } catch (e) {
+    loginShowError('otp', 'ኔትወርክ ስህተት። እንደገና ይሞክሩ');
+  } finally {
+    loginSetLoading('login-otp-btn', false);
+  }
 }
 
 /* ── PROFILE ─────────────────────────────────── */
@@ -153,8 +234,8 @@ async function loadFilms(reset) {
     document.getElementById('load-more').classList.add('hidden');
   }
   try {
-    const qs = new URLSearchParams({ type: 'all', page, initData });
-    const d = await fetch('/api/films?' + qs, { headers: { 'X-Init-Data': initData } })
+    const qs = new URLSearchParams({ type: 'all', page });
+    const d = await fetch('/api/films?' + qs, { headers: _authHeaders() })
       .then(r => r.json());
 
     const grid = document.getElementById('grid');
@@ -218,8 +299,8 @@ async function _fetchSearch(reset) {
   const grid = document.getElementById('grid');
   const btn = document.getElementById('load-more');
   try {
-    const qs = new URLSearchParams({ q: searchQuery, type: 'all', page: searchPage, initData });
-    const d = await fetch('/api/films?' + qs, { headers: { 'X-Init-Data': initData } })
+    const qs = new URLSearchParams({ q: searchQuery, type: 'all', page: searchPage });
+    const d = await fetch('/api/films?' + qs, { headers: _authHeaders() })
       .then(r => r.json());
     if (reset) grid.innerHTML = '';
     if (!d.films?.length) {
@@ -465,12 +546,11 @@ async function openPlayer(filmId, title) {
 
   let info;
   try {
-    const qs = new URLSearchParams({ initData });
     const statusTxt = load.querySelector('.vid-status-txt');
     if (statusTxt) statusTxt.textContent = 'ፊልም እያዘጋጀን ነው…';
     const r = await fetch(
-      `/api/stream/start/${filmId}?${qs}`,
-      { headers: { 'X-Init-Data': initData } }
+      `/api/stream/start/${filmId}`,
+      { headers: _authHeaders() }
     );
     if (!r.ok) throw new Error('HTTP ' + r.status);
     info = await r.json();
@@ -519,10 +599,26 @@ function downloadFilm() {
 }
 
 /* ── HELPERS ─────────────────────────────────── */
+function _authHeaders() {
+  const h = {};
+  if (initData) h['X-Init-Data'] = initData;
+  if (webToken)  h['Authorization'] = 'Bearer ' + webToken;
+  return h;
+}
+
 async function api(url) {
-  const r = await fetch(url, { headers: { 'X-Init-Data': initData } });
+  const r = await fetch(url, { headers: _authHeaders() });
+  if (r.status === 401) { _handleUnauthorized(); throw new Error('Unauthorized'); }
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
+}
+
+function _handleUnauthorized() {
+  if (!tg?.initData) {
+    localStorage.removeItem('et_web_token');
+    webToken = '';
+    showLoginPage();
+  }
 }
 
 function fmtSize(b) {

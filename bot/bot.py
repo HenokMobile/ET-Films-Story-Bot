@@ -1407,6 +1407,8 @@ async def main():
 
     # Create application with conflict resolution
     application = Application.builder().token(config.BOT_TOKEN).build()
+    from webapp.shared import set_bot_app
+    set_bot_app(application)
 
     # Set up error handling for conflicts
     application.add_error_handler(handle_bot_error)

@@ -9,7 +9,7 @@ from urllib.parse import quote
 import aiohttp
 from aiohttp import web
 
-from webapp.validate import validate_init_data
+from webapp.validate import validate_init_data, validate_auth, create_web_token
 from webapp.telethon_stream import get_file_info, iter_file_chunks
 
 FFMPEG = "ffmpeg"
@@ -153,12 +153,13 @@ SERIES_DB = str(BASE_DIR / "series.db")
 USER_DB = str(BASE_DIR / "user.db")
 
 
+import random
+import time as _time
+
+_otp_store: dict = {}
+
 def _auth(request) -> dict | None:
-    init_data = (
-        request.headers.get("X-Init-Data")
-        or request.query.get("initData", "")
-    )
-    return validate_init_data(init_data)
+    return validate_auth(request)
 
 
 async def serve_app(request):
@@ -711,6 +712,97 @@ async def tmdb_detail(request):
         return web.json_response({})
 
 
+async def request_otp(request):
+    try:
+        body = await request.json()
+    except Exception:
+        raise web.HTTPBadRequest(text="Invalid JSON")
+
+    phone = (body.get("phone") or "").strip().replace(" ", "").replace("-", "")
+    if not phone:
+        return web.json_response({"error": "ስልክ ቁጥር ያስፈልጋል"}, status=400)
+
+    phone_variants = [phone]
+    if phone.startswith("0"):
+        phone_variants.append("+251" + phone[1:])
+        phone_variants.append("251" + phone[1:])
+    elif phone.startswith("+251"):
+        phone_variants.append("0" + phone[4:])
+    elif phone.startswith("251"):
+        phone_variants.append("0" + phone[3:])
+        phone_variants.append("+" + phone)
+
+    user_id = None
+    try:
+        with sqlite3.connect(USER_DB) as conn:
+            placeholders = ",".join("?" * len(phone_variants))
+            row = conn.execute(
+                f"SELECT user_id FROM users WHERE phone_number IN ({placeholders}) LIMIT 1",
+                phone_variants,
+            ).fetchone()
+            if row:
+                user_id = row[0]
+    except Exception as e:
+        logger.error(f"OTP lookup error: {e}")
+
+    if not user_id:
+        return web.json_response({"error": "ይህ ስልክ ቁጥር Bot ላይ አልተመዘገበም"}, status=404)
+
+    otp = str(random.randint(100000, 999999))
+    _otp_store[phone] = {"otp": otp, "user_id": user_id, "expires": _time.time() + 300}
+
+    try:
+        from webapp.shared import get_bot_app
+        bot_app = get_bot_app()
+        if bot_app:
+            await bot_app.bot.send_message(
+                chat_id=user_id,
+                text=(
+                    "🔐 *ET Films — Web Login*\n\n"
+                    f"የእርስዎ ኮድ: `{otp}`\n\n"
+                    "⏱ ይህ ኮድ *5 ደቂቃ* ብቻ ይሰራል።\n"
+                    "ኮዱን ከሌሎች አይጋሩ!"
+                ),
+                parse_mode="Markdown",
+            )
+        else:
+            logger.error("Bot app not ready for OTP sending")
+            return web.json_response({"error": "Bot አልተዘጋጀም። ቆይተው ይሞክሩ"}, status=503)
+    except Exception as e:
+        logger.error(f"OTP send error: {e}")
+        return web.json_response({"error": "ኮዱን መላክ አልተቻለም"}, status=500)
+
+    return web.json_response({"ok": True, "message": "ኮዱ ወደ Telegram ተልኳል"})
+
+
+async def verify_otp(request):
+    try:
+        body = await request.json()
+    except Exception:
+        raise web.HTTPBadRequest(text="Invalid JSON")
+
+    phone = (body.get("phone") or "").strip().replace(" ", "").replace("-", "")
+    otp = str(body.get("otp") or "").strip()
+
+    if not phone or not otp:
+        return web.json_response({"error": "ስልክ ቁጥር እና ኮድ ያስፈልጋሉ"}, status=400)
+
+    record = _otp_store.get(phone)
+    if not record:
+        return web.json_response({"error": "ኮድ አልተላከም። እንደገና ይሞክሩ"}, status=400)
+
+    if _time.time() > record["expires"]:
+        _otp_store.pop(phone, None)
+        return web.json_response({"error": "ኮዱ ጊዜው አልፏል። እንደገና ይላኩ"}, status=400)
+
+    if record["otp"] != otp:
+        return web.json_response({"error": "ኮዱ ትክክል አይደለም"}, status=400)
+
+    _otp_store.pop(phone, None)
+    token = create_web_token(int(record["user_id"]))
+    return web.json_response({"ok": True, "token": token})
+
+
 def setup_webapp_routes(app: web.Application):
     app.router.add_get("/webapp", serve_app)
     app.router.add_get("/webapp/", serve_app)
@@ -722,3 +814,5 @@ def setup_webapp_routes(app: web.Application):
     app.router.add_get("/stream/{film_id}", stream_film)
     app.router.add_get("/hls/{session_id}/playlist.m3u8", serve_hls_playlist)
     app.router.add_get("/hls/{session_id}/{segment}", serve_hls_segment)
+    app.router.add_post("/api/auth/request-otp", request_otp)
+    app.router.add_post("/api/auth/verify-otp", verify_otp)
