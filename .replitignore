@@ -1,0 +1,22 @@
+# Development assets
+attached_assets/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Database WAL files (runtime only)
+*.db-shm
+*.db-wal
+
+# Telethon session (re-created at runtime)
+*.session
+*.session-journal
+
+# Local agent/skill files
+.local/
+.agents/
+
+# Logs
+*.log
